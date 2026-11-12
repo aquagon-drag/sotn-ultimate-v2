@@ -987,38 +987,38 @@ typedef struct {
 // id sets the PS1 dub bit while it plays
 #define MOD_SOUND_NOCTURNE_JP (MU_NOCTURNE | 0x8000)
 static const ModSoundTrack g_ModSoundTracks[] MOD_RO = {
-    {_S("Metamorphosis"), MU_METAMORPHOSIS},                   // SD2E
+    {_S("Metamorphosis I"), MU_METAMORPHOSIS},                   // SD2E
     {_S("Prologue"), MU_PROLOGUE},                             // SD19
     {_S("Dance of Illusions"), MU_DANCE_OF_ILLUSIONS},         // SD18
-    {_S("Moonlight Nocturne"), MU_MOONLIGHT_NOCTURNE},         // SD2F
+    {_S("Nocturne in the Moonlight"), MU_MOONLIGHT_NOCTURNE},         // SD2F
     {_S("Prayer"), MU_PRAYER},                                 // SD15
     {_S("Dracula's Castle"), MU_DRACULAS_CASTLE},              // SD0A
     {_S("Dance of Gold"), MU_DANCE_OF_GOLD},                   // SD04
     {_S("Marble Gallery"), MU_MARBLE_GALLERY},                 // SD09
-    {_S("Tower of Mist"), MU_TOWER_OF_MIST},                   // SD0C
+    {_S("Tower of Evil Mist"), MU_TOWER_OF_MIST},                   // SD0C
     {_S("Nocturne"), MU_NOCTURNE},                             // SD20 (PSP)
     {_S("Nocturne (JP)"), MOD_SOUND_NOCTURNE_JP},              // SD20
     {_S("Wood Carving Partita"), MU_WOOD_CARVING_PARTITA},     // SD06
-    {_S("Door of Holy Spirits"), MU_DOOR_OF_HOLY_SPIRITS},     // SD11
+    {_S("Doorway of Spirits"), MU_DOOR_OF_HOLY_SPIRITS},     // SD11
     {_S("Festival of Servants"), MU_FESTIVAL_OF_SERVANTS},     // SD0F
-    {_S("Land of Benediction"), MU_LAND_OF_BENEDICTION},       // SD1F
-    {_S("Requiem for the Gods"), MU_REQUIEM_FOR_THE_GODS},     // SD01
-    {_S("Crystal Teardrops"), MU_CRYSTAL_TEARDROPS},           // SD07
-    {_S("Abandoned Pit"), MU_ABANDONED_PIT},                   // SD03
+    {_S("Resting Place"), MU_LAND_OF_BENEDICTION},       // SD1F
+    {_S("Requiem of the Gods"), MU_REQUIEM_FOR_THE_GODS},     // SD01
+    {_S("Crystal Drops"), MU_CRYSTAL_TEARDROPS},           // SD07
+    {_S("Road of the Departed"), MU_ABANDONED_PIT},                   // SD03
     {_S("Rainbow Cemetery"), MU_RAINBOW_CEMETERY},             // SD05
     {_S("Silence"), MU_SILENCE},                               // SD1E
     {_S("Lost Painting"), MU_LOST_PAINTING},                   // SD10
-    {_S("Dance of Pales"), MU_DANCE_OF_PALES},                 // SD02
-    {_S("Curse Zone"), MU_CURSE_ZONE},                         // SD12
-    {_S("Enchanted Banquet"), MU_ENCHANTED_BANQUET},           // SD1A
+    {_S("Dance of Pearls"), MU_DANCE_OF_PALES},                 // SD02
+    {_S("Cursed Sanctuary"), MU_CURSE_ZONE},                         // SD12
+    {_S("Demonic Banquet"), MU_ENCHANTED_BANQUET},           // SD1A
     {_S("Wandering Ghosts"), MU_WANDERING_GHOSTS},             // SD0D
     {_S("The Tragic Prince"), MU_THE_TRAGIC_PRINCE},           // SD0B
-    {_S("The Door to the Abyss"), MU_THE_DOOR_TO_THE_ABYSS},   // SD0E
-    {_S("Heavenly Doorway"), MU_HEAVENLY_DOORWAY},             // SD08
-    {_S("Death Ballad"), MU_DEATH_BALLAD},                     // SD14
-    {_S("Blood Relations"), MU_BLOOD_RELATIONS},               // SD16
+    {_S("Doorway to the Abyss"), MU_THE_DOOR_TO_THE_ABYSS},   // SD0E
+    {_S("Doorway to Heaven"), MU_HEAVENLY_DOORWAY},             // SD08
+    {_S("Death's Ballad"), MU_DEATH_BALLAD},                     // SD14
+    {_S("Strange Bloodlines"), MU_BLOOD_RELATIONS},               // SD16
     {_S("Metamorphosis II"), MU_METAMORPHOSIS_II},             // SD30
-    {_S("Final Toccata"), MU_FINAL_TOCATTA},                   // SD17
+    {_S("Finale Toccata"), MU_FINAL_TOCATTA},                   // SD17
     {_S("Black Banquet"), MU_BLACK_BANQUET},                   // SD13
     {_S("Metamorphosis III"), MU_METAMORPHOSIS_III},           // SD31
     {_S("The Old Librarian"), MU_MOD_OLD_LIBRARIAN},           // SD24
@@ -1029,7 +1029,7 @@ static const ModSoundTrack g_ModSoundTracks[] MOD_RO = {
     {_S("Beginning Remix 2"), MU_MOD_SOUND_28},                // SD28
     {_S("Bloody Tears Remix 1"), MU_MOD_RICHTER_ENTRANCE},     // SD2A
     {_S("Bloody Tears Remix 2"), MU_MOD_SKELETON_LEADER},      // SD2B
-    {_S("Maria Battle"), MU_MOD_MARIA_BOSS},                   // SD23
+    {_S("Guardian"), MU_MOD_MARIA_BOSS},                   // SD23
     {_S("I Am the Wind"), MU_STAFF_CREDITS},                   // SD1D
     {_S("Mournful Serenade"), MU_MOD_ENDING_PSP},              // PSP
 };
