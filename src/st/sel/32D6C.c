@@ -426,6 +426,7 @@ s32 func_801B3A94(s32 arg0) {
                     // game's. (Also after the file menu's rename / copy, where
                     // nothing reads them: a game start sets them again)
                     u8 flags = MOD_STATUS_FLAGS;
+                    u8 flags2 = MOD_STATUS_FLAGS2; // (the second byte too)
                     ApplySaveData(g_Pix);
                     // the file menu's rename: into the loaded status, not
                     // the card's copy. Saves since "SAT4" are in the retail
@@ -436,6 +437,7 @@ s32 func_801B3A94(s32 arg0) {
                     }
                     StoreSaveData(g_Pix, D_801BB008, save->info.cardIcon);
                     MOD_STATUS_FLAGS = flags;
+                    MOD_STATUS_FLAGS2 = flags2;
                 }
 #else
                 ApplySaveData(g_Pix);

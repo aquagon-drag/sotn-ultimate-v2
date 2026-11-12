@@ -171,6 +171,22 @@
 // converters copy saveName..D_80097C40 as is) without changing the save
 // layout. Retail saves hold 0 there. SEL writes the byte on every new game.
 #define MOD_STATUS_FLAGS g_Status.saveName[11]
+// A second flags byte, g_Status.saveName[9] (same reasoning: SEL's name
+// entry zeroes bytes 8 and 9 on every new game, so it is 0 before the Player
+// Select sets it; every name strcpy writes at most byte 8; the save
+// converters copy saveName..D_80097C40 as is; the card header's file name
+// stops at byte 7 and the file list's name summary at the NUL in byte 8; the
+// save summary copies byte 9 into info.name but never reads it). Retail and
+// older mod saves hold 0, so every flag below clear = the behaviour before it
+// existed. Written by the Player Select (every character) and, in Alucard
+// games, the System screen's popup (mods/sotn-ultimate/src/menu/sysopt.c).
+#define MOD_STATUS_FLAGS2 g_Status.saveName[9]
+#define MOD_FLAG2_ENDING_PSP 0x01    // ending theme: PSP "Mournful Serenade"
+#define MOD_FLAG2_SCRIPT_RETRANS 0x02 // script and font: fan retranslation
+#define MOD_FLAG2_SUBTITLES 0x04     // subtitles for the voice-only lines
+#define MOD_ENDING_PSP() (MOD_STATUS_FLAGS2 & MOD_FLAG2_ENDING_PSP)
+#define MOD_SCRIPT_RETRANS() (MOD_STATUS_FLAGS2 & MOD_FLAG2_SCRIPT_RETRANS)
+#define MOD_SUBTITLES_ON() (MOD_STATUS_FLAGS2 & MOD_FLAG2_SUBTITLES)
 // Saturn port: Alucard sprinting with the Godspeed Shoes (his sprint runs
 // in player step 0x13 = Player_FlameWhip, the same number as on the
 // Saturn). The Saturn's doors open in that step too (warp 0x060DEEB8).
