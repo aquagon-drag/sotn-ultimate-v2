@@ -107,6 +107,12 @@ TRACKS = [
 PSP_BGM = os.path.join(ROOT, "disks/psp/snd_e/PS_BGM")
 ONESHOTS = [
     ("MU_MOD_NOCTURNE_EN", "PS_HEKIRU.at3", 0.44, 0x3F, 64),
+    # the PSP ending theme "Mournful Serenade" (PS_CREDIT.at3, the same file
+    # in sound/ and snd_e/; stereo, 277.85 s): SEL plays it for the staff
+    # credits instead of "I Am the Wind" (config 0x3C, 280.3 s, volume 72)
+    # while MOD_ENDING_PSP(). The gain brings its active RMS (6334 at gain 1)
+    # to the PS1 one's (3249)
+    ("MU_MOD_ENDING_PSP", "PS_CREDIT.at3", 0.51, 0x3C, 72),
 ]
 # a one-shot's timer ends this many VSyncs after its last sound
 ONESHOT_MARGIN = 3

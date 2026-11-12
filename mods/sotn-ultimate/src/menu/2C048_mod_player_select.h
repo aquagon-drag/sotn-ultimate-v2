@@ -1031,6 +1031,7 @@ static const ModSoundTrack g_ModSoundTracks[] MOD_RO = {
     {_S("Bloody Tears Remix 2"), MU_MOD_SKELETON_LEADER},      // SD2B
     {_S("Maria Battle"), MU_MOD_MARIA_BOSS},                   // SD23
     {_S("I Am the Wind"), MU_STAFF_CREDITS},                   // SD1D
+    {_S("Mournful Serenade"), MU_MOD_ENDING_PSP},              // PSP
 };
 const char g_ModSoundText[] MOD_RO = _S("Now playing");
 const char g_ModSoundHint[] MOD_RO = _S("Play/Stop");

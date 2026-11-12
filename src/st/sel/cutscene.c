@@ -293,7 +293,7 @@ void EntityCutscene(Entity* self) {
                 nextChar = *g_Dialogue.scriptCur++;
                 nextChar <<= 4;
                 nextChar |= *g_Dialogue.scriptCur++;
-                g_api.PlaySfx(nextChar);
+                g_api.PlaySfx(MOD_ENDING_SONG(nextChar));
                 continue;
             case CSOP_WAIT_FOR_SOUND:
                 if (g_SkipCutscene || g_api.func_80131F68() != false) {
@@ -382,7 +382,7 @@ void EntityCutscene(Entity* self) {
                 nextChar = *g_Dialogue.scriptCur++;
                 nextChar <<= 4;
                 nextChar |= *g_Dialogue.scriptCur++;
-                g_api.PlaySfx(nextChar);
+                g_api.PlaySfx(MOD_ENDING_SONG(nextChar));
                 continue;
             case CSOP_SCRIPT_UNKNOWN_21:
                 D_801BC3E8 = 0;

@@ -849,7 +849,7 @@ void func_801B60D4(void) {
     case 4:
 #if defined(MOD_SATURN)
         if (D_800978B4 == MOD_ENDING_STAFF) {
-            g_api.PlaySfx(MU_STAFF_CREDITS);
+            g_api.PlaySfx(MOD_ENDING_SONG(MU_STAFF_CREDITS));
         }
 #endif
         ClearImage(&D_8018258C, 0, 0, 0);

@@ -83,7 +83,7 @@ __asm__(".text\n"
         ".word ModSysOptBox\n"
         ".word ModSysOptInput\n"
         ".word ModSysOptSound\n"
-        ".asciz \"Boss versions\\201\\103 game balance and voices\"\n"
+        ".asciz \"Boss versions\\201\\103balance\\201\\103dub\\201\\103ending\\201\\103text\"\n"
         ".align 2\n");
 
 #define ROW 6     // the row, after the retail six (16 px apart: y 0x90)

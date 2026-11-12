@@ -167,3 +167,14 @@ extern StreamEnv g_StreamEnv;
 extern s32 g_MemcardBlockRead;
 extern s32 g_MemcardStep;
 extern s32 D_801D6B24;
+
+#if defined(MOD_SATURN)
+#include "../../dra/mod_xa_music.h" // MU_MOD_ENDING_PSP
+// the ending's theme: "I Am the Wind" (the script's / the staff roll's id), or
+// the PSP's "Mournful Serenade" with the Player Select's / System's Ending
+// option (game_mod.h MOD_ENDING_PSP)
+#define MOD_ENDING_SONG(id) \
+    ((id) == MU_STAFF_CREDITS && MOD_ENDING_PSP() ? MU_MOD_ENDING_PSP : (id))
+#else
+#define MOD_ENDING_SONG(id) (id)
+#endif
