@@ -128,6 +128,14 @@ for name, retail_path in STAGES.items():
         off = int(m[1], 16) - base
         assert off == 0x25FC, hex(off)
         edited.append((off, off + area))
+    # test branch only (MOD_TEST_ENDING_SHORTCUT): 0x160 bytes of SEL's dead
+    # config copy hold the test hook (src/st/sel/config_us.c), right after the
+    # staff roll's table (step 5) and before the text packs (0x3000)
+    m = re.search(r"0x([0-9a-f]+)\s+ModTestEnding\n", text)
+    if name == "stsel" and m:
+        hook = int(m[1], 16) - 4 - base
+        assert 0x25FC + area <= hook and hook + 0x160 <= 0x3000, hex(hook)
+        edited.append((hook, hook + 0x160))
     bad = []
     for i in range(0, n, 4):
         if retail[i : i + 4] == built[i : i + 4]:

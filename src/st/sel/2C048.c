@@ -29,6 +29,9 @@ void func_801B9C80(void);
 void InitSel(s32 objLayoutId);
 void func_801B60D4(void);
 void func_801B17C8(void);
+#if defined(MOD_TEST_ENDING_SHORTCUT)
+void ModTestEnding(s32 apply); // config_us.c
+#endif
 
 // DATA
 Overlay g_Overlay = {
@@ -2021,6 +2024,9 @@ void Update(void) {
         func_801B2608("Do not remove Memory Card．", 5);
         func_801ACBE4(GFX_UNK_15, 0);
         func_801B367C(D_801D6B04);
+#if defined(MOD_TEST_ENDING_SHORTCUT)
+        ModTestEnding(false); // latch L1+R1 as held when the file was chosen
+#endif
         g_GameEngineStep++;
         break;
     case Upd_Eng_257:
@@ -2031,6 +2037,9 @@ void Update(void) {
             D_800978C4 = 1;
         }
         if (temp_s1 == 1) {
+#if defined(MOD_TEST_ENDING_SHORTCUT)
+            ModTestEnding(true);
+#endif
             D_8003C730 = 1;
             D_80097924 = D_801D6B04 / 15;
             D_8006C378 = g_SaveSummary[D_80097924].slot[D_801D6B04 % 15];

@@ -101,6 +101,15 @@
 // (src/save_mgr.h ModItemsTestGift). Off for normal builds.
 // #define MOD_SATURN_ITEMS_TEST // test item gift: off
 
+// Test aid (this branch only, never merged): reach the ending credits fast.
+// Loading a file in SEL's file menu with L1+R1 held (from the confirming X
+// to the fade-out) puts Alucard in the Dracula fight room of the inverted
+// castle (RBO6 room (31,30), the arrival of teleport 0x08) with max stats and
+// Dracula's HP at 1 (src/st/sel/config_us.c ModTestEnding; code and data live
+// in the dead copy of DRA's config tables, so SEL does not grow). Without
+// L1+R1 the load is normal. The save keeps its own Ending option.
+#define MOD_TEST_ENDING_SHORTCUT
+
 // The cut Outer Wall "Ghost" (flaming skull, record 0xB1, NO1 entity 0x51,
 // src/st/no1/unk_54400.c): no retail room places it. On: NO1 room 13 (the
 // tower, layout 14, src/st/no1/mod_layout.h from
