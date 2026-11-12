@@ -2,9 +2,10 @@
 // Saturn port mod: the pause menu System screen's "Extra settings" row
 // (Alucard games). X opens a popup to its right, in the retail Sound box's
 // window (MENU_DG_CFG_SOUND, resized while it is ours), with the Player
-// Select's four Alucard options (Boss Richter, Boss Maria, Balance, Dub):
-// Up / Down pick one, Left / Right (or X) change it (the flags byte,
-// include/game.h MOD_STATUS_FLAGS), Triangle / Circle close it. A boss
+// Select's Alucard options (Boss Richter, Boss Maria, Balance, Dub, Ending,
+// Script, Subtitles): Up / Down pick one, Left / Right (or X) change it (the
+// flags bytes, include/game.h MOD_STATUS_FLAGS and MOD_STATUS_FLAGS2; the last
+// three only set their flag), Triangle / Circle close it. A boss
 // option is greyed and locked while that boss is alive. While the box is up
 // (opening, open, closing) it owns the pad: the System list sees no input.
 //
@@ -86,27 +87,32 @@ __asm__(".text\n"
         ".align 2\n");
 
 #define ROW 6     // the row, after the retail six (16 px apart: y 0x90)
-#define ROWS 4    // the popup's options
+#define ROWS 7    // the popup's options
 #define POP_X 172 // the popup's window (the Sound box's is 172, 112, 57, 32)
-#define POP_Y 124 // (ends at 188: the info bar starts at 193)
+#define POP_Y 76  // (ends at 188: the info bar starts at 193; 16 per row)
 #define POP_W 168 // (the right margin as wide as the left one)
-#define POP_H 64
-#define VALUE_DX 112
+#define POP_H 112
+#define VALUE_DX 104 // (a value has 60 px: 7 characters)
 
-static const char g_SysOptName[4][8] = {
-    _S("PS1"), _S("Saturn"), _S("PSP"), _S("JP")};
+static const char g_SysOptName[8][9] = {
+    _S("PS1"),   _S("Saturn"), _S("PSP"), _S("JP"),
+    _S("Off"),   _S("On"),     _S("Default"), _S("Retrans")};
 static const char* const g_SysOptLabel[ROWS] = {
-    _S("Boss Richter"), _S("Boss Maria"), _S("Balance"), _S("Dub")};
+    _S("Boss Richter"), _S("Boss Maria"), _S("Balance"), _S("Dub"),
+    _S("Ending"),       _S("Script"),     _S("Subtitles")};
 #define SYSOPT_NAME() _S("Extra settings")
 #define SYSOPT_LABEL(r) g_SysOptLabel[r]
-// each option: the flag bits it owns, and per choice (the Player Select's
-// order, src/st/sel/2C048.c) their value and its name
+// each option: the flag bits it owns (in the second flags byte for the rows
+// with flags2 set), and per choice (the Player Select's order,
+// src/st/sel/2C048.c) their value and its name
 typedef struct {
     u8 mask;
     u8 n;
     u8 val[3];
     u8 name[3];
+    u8 flags2;
 } SysOptRow;
+#define SYSOPT_FLAGS(row) ((row)->flags2 ? &MOD_STATUS_FLAGS2 : &MOD_STATUS_FLAGS)
 static const SysOptRow g_SysOptRows[ROWS] = {
     {MOD_FLAG_BOSS_RIC_SATURN, 2, {0, MOD_FLAG_BOSS_RIC_SATURN}, {0, 1}},
     {MOD_FLAG_MARIA_BOSS_PSP, 2, {0, MOD_FLAG_MARIA_BOSS_PSP}, {1, 2}},
@@ -115,6 +121,9 @@ static const SysOptRow g_SysOptRows[ROWS] = {
      3,
      {0, MOD_FLAG_PS1_DUB, MOD_FLAG_JP_DUB},
      {2, 0, 3}},
+    {MOD_FLAG2_ENDING_PSP, 2, {0, MOD_FLAG2_ENDING_PSP}, {0, 2}, 1},
+    {MOD_FLAG2_SCRIPT_RETRANS, 2, {0, MOD_FLAG2_SCRIPT_RETRANS}, {6, 7}, 1},
+    {MOD_FLAG2_SUBTITLES, 2, {0, MOD_FLAG2_SUBTITLES}, {4, 5}, 1},
 };
 #define DUB 3
 
@@ -130,7 +139,7 @@ static s32 SysOptCur(const SysOptRow* row) {
     s32 i;
 
     for (i = row->n - 1; i > 0; i--) {
-        if ((MOD_STATUS_FLAGS & row->mask) == row->val[i]) {
+        if ((*SYSOPT_FLAGS(row) & row->mask) == row->val[i]) {
             break;
         }
     }
@@ -268,7 +277,7 @@ static void PopInput(MenuContext* pop) {
                 // the stage's bank was loaded with these
                 g_StageDubOld = 1 + (MOD_STATUS_FLAGS & DUB_BITS);
             }
-            MOD_STATUS_FLAGS = (MOD_STATUS_FLAGS & ~row->mask) | row->val[v];
+            *SYSOPT_FLAGS(row) = (*SYSOPT_FLAGS(row) & ~row->mask) | row->val[v];
             if (g_PopRow == DUB) {
                 // the familiar's bank has the dub's voices too: the menu's
                 // exit reloads it as when another one is chosen
