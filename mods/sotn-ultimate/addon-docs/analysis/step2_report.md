@@ -1,0 +1,8 @@
+# Step 2: PSP ending theme (branch addon/step2-psp-ending, 1 commit on step 1)
+Image /home/claude/work/out/step2_psp_ending.bin (+.cue), 304,764 sectors (716,804,928 B; limit 333,000; step 1 299,644). Not run in an emulator.
+Files: gen_saturn_music.py (ONESHOTS += MU_MOD_ENDING_PSP, PS_CREDIT.at3, gain 0.51, volume 72, like 0x3C), src/st/sel/sel.h (MOD_ENDING_SONG macro), cutscene.c (PLAY_SOUND + SCRIPT_UNKNOWN_20 ops; the script plays 0x33C through op 20), 34B30.c (STAFF path), 2C048_mod_player_select.h (Sound mode "Mournful Serenade" after "I Am the Wind"), sysopt.c (info bar text), generated: mod_xa_music.h, lba_us.h, 42398.c MOD_DRA_PAD.
+Measurements: MOD_DATA_PAD 64, MOD_DRA_PAD 24, SEL ends 0x801dffc8 (56 B free; was 168; dead config_us.c not touched), XA_STR1 252,176 sectors (step 1 247,056, +5,120), id 0x548 = config index 0x248 (g_ModXaMusicConfigs entry 12), stream 5,210 sectors, 277.85 s encoded, timer ends at last loud sample 275.98 s (credit roll 280.3 s: ~4.3 s early).
+Gain: active RMS of PS1 "I Am the Wind" decoded from the disc 3249, PSP 6334 at gain 1 -> 0.51.
+Verification: stream decoded back from build/us/XA_STR1. (file 3 ch 5) vs the builder's decode at the same gain: stereo 37.8 kHz, L/R corr 0.99995/0.99996, SNR 40/41 dB, RMS equal, peaks 16.8k, last loud sample 275.98 s. repack_xa: all 1069 configs verified. All build checks OK.
+Flag: no DRA code needed; the swap is SEL-only. flags2 survives the ending's card reload (step 1). The "STAFF" name-code roll always plays the PS1 song (name entry zeroes saveName[9]).
+Diff vs step 1: XA_STR1 layout moved, so every file after it shifts +5,120 sectors (directory, LBA literals in DRA/SEL), DRA (config table, pad, SEL length), SEL, ISO headers; secpatch 142,655 sectors, 336,095,180 B.
