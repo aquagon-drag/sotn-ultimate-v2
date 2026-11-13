@@ -255,13 +255,16 @@ static void SysOptBanks(void) {
     g_CdStep = CdStep_LoadInit;
 }
 
-// DRA's names and descriptions follow the Dub (and, later, the Script) row:
-// the text pack (include/game_mod.h MOD_TEXT_*, the applier in
-// text_pack.h, as SEL applies it at every game start / load). Its chunks are
-// in SEL.BIN's dead config copy on the disc; DRA's CdFile_DemoKey entry
-// (g_LbaBinDemokey: sector 0x7415 + 4 * g_LoadOvlIdx, 0x2000 bytes, copied
-// to DEMO_KEY_PTR by its callback; only the title's demos use it) reads one
-// with g_LoadOvlIdx = g_ModTextCdIdx + chunk, so no CdFile entry changes.
+// DRA's names and descriptions follow the Dub and Script rows: the text pack
+// (include/game_mod.h MOD_TEXT_*, the applier in text_pack.h, as SEL applies
+// it at every game start / load). The PS1 / PSP / restore packs' chunks are
+// in SEL.BIN's dead config copy on the disc, the retranslation's in
+// SD/TXT_RT.BIN; DRA's CdFile_DemoKey entry (g_LbaBinDemokey: sector
+// 0x7415 + 4 * g_LoadOvlIdx, 0x2000 bytes, copied to DEMO_KEY_PTR by its
+// callback; only the title's demos use it) reads one with g_LoadOvlIdx =
+// g_ModTextCdIdx (or g_ModTextRtCdIdx) + chunk, so no CdFile entry changes.
+// From the retranslation to a dub's text it takes two passes: the restore
+// pack (every chunk), then the dub's (chunk 0).
 // Started as soon as the wanted pack is not the one applied (the box open or
 // closed: the bank loads below wait for the CD); applied on the first frame
 // the CD is idle again. g_LoadOvlIdx (set before every load by whoever loads)
@@ -271,14 +274,17 @@ static void SysOptBanks(void) {
 // text changes the next time the System screen shows (or at SEL)
 #include "text_pack.h"
 #define TEXT_BUF ((const u8*)0x801E8000) // DEMO_KEY_PTR
-// (a word, so check_text_packs.py reads what runs)
+// (words, so check_text_packs.py reads what runs)
 const s32 g_ModTextCdIdx = MOD_TEXT_CD_IDX;
+const s32 g_ModTextRtCdIdx = MOD_TEXT_RT_CD_IDX;
 static s32 g_TextLoad = 0;  // 1 + the chunk on its way (0: none)
-static s32 g_TextPack = 0;  // the pack being applied
+static s32 g_TextPack = 0;  // the pack this pass applies
+static s32 g_TextNext = 0;  // 1 + the pack of the pass after it (0: none)
 static s32 g_TextOvl = 0;   // g_LoadOvlIdx before the load
 static s32 g_TextFails = 0; // chunks that failed the check
 static void SysOptText(void) {
     s32 c;
+    s32 tag;
 
     if (g_TextLoad) {
         if (g_CdStep != CdStep_None || g_IsUsingCd) {
@@ -286,30 +292,48 @@ static void SysOptText(void) {
         }
         c = g_TextLoad - 1;
         g_TextLoad = 0;
-        if (g_LoadOvlIdx == g_ModTextCdIdx + c) {
+        if (g_LoadOvlIdx == (g_TextPack == MOD_TEXT_PACK_RT ? g_ModTextRtCdIdx
+                                                            : g_ModTextCdIdx) +
+                               c) {
             g_LoadOvlIdx = g_TextOvl;
         }
-        if (!ModTextChunkOk(TEXT_BUF) || TEXT_BUF[8] != c) {
+        if (!ModTextChunkOk(TEXT_BUF, c)) {
             g_TextFails++;
             return;
         }
         ModTextRun(TEXT_BUF, g_TextPack);
-        if (c + 1 >= TEXT_BUF[9]) {
+        if (c + 1 < TEXT_BUF[9]) {
+            c++; // its next chunk
+        } else if (g_TextNext) {
+            g_TextPack = g_TextNext - 1; // the next pass
+            g_TextNext = 0;
+            c = 0;
+        } else {
             MOD_DUB_STATE->textPack = MOD_TEXT_TAG(g_TextPack);
             return;
         }
-        c++; // its next chunk
     } else {
-        if (MOD_DUB_STATE->textPack == MOD_TEXT_TAG(MOD_TEXT_PACK_WANTED()) ||
-            g_TextFails >= 2 || g_CdStep != CdStep_None || g_IsUsingCd) {
+        tag = MOD_DUB_STATE->textPack;
+        if (tag == MOD_TEXT_TAG(MOD_TEXT_PACK_WANTED()) || g_TextFails >= 2 ||
+            g_CdStep != CdStep_None || g_IsUsingCd) {
             return;
         }
         g_TextPack = MOD_TEXT_PACK_WANTED();
+        g_TextNext = 0;
+        if (g_TextPack != MOD_TEXT_PACK_RT &&
+            tag != MOD_TEXT_TAG(MOD_TEXT_PACK_PS1) &&
+            tag != MOD_TEXT_TAG(MOD_TEXT_PACK_PSP)) {
+            // from the retranslation (or half applied): restore first
+            g_TextNext = g_TextPack + 1;
+            g_TextPack = MOD_TEXT_PACK_RESTORE;
+        }
         MOD_DUB_STATE->textPack = 0; // (until its last chunk is applied)
         c = 0;
     }
     g_TextOvl = g_LoadOvlIdx;
-    g_LoadOvlIdx = g_ModTextCdIdx + c;
+    g_LoadOvlIdx =
+        (g_TextPack == MOD_TEXT_PACK_RT ? g_ModTextRtCdIdx : g_ModTextCdIdx) +
+        c;
     g_LoadFile = CdFile_DemoKey;
     g_CdStep = CdStep_LoadInit;
     g_TextLoad = c + 1;

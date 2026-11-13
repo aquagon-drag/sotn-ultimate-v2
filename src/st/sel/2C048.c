@@ -1388,7 +1388,13 @@ void Update(void) {
 #else
         func_801AD78C();
 #endif
+#if defined(MOD_SATURN) && defined(VERSION_US)
+        // (the retranslation's text pack, read from the disc: the fade's
+        // end waits for it)
+        if (func_801ACEC0() && ModTextReady()) {
+#else
         if (func_801ACEC0()) {
+#endif
             func_801B18F4();
             func_801B19F4();
             func_801B1DA8();
@@ -2059,7 +2065,11 @@ void Update(void) {
         break;
     case Upd_Eng_260:
         func_801ADF94(0x81, 0);
+#if defined(MOD_SATURN) && defined(VERSION_US)
+        if (func_801ACEC0() && ModTextReady()) {
+#else
         if (func_801ACEC0()) {
+#endif
             g_GameStep++;
         }
         break;

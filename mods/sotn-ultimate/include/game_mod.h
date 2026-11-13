@@ -338,15 +338,22 @@ typedef struct {
 // for it.
 #define MOD_TEXT_PACK_PS1 0 // the PS1 script (the PS1 dub)
 #define MOD_TEXT_PACK_PSP 1 // the PSP script (the PSP and JP dubs)
-#define MOD_TEXT_PACK_RT 2  // reserved: the fan retranslation (not built yet)
-#define MOD_TEXT_PACKS 4    // directory slots in a chunk
+#define MOD_TEXT_PACK_RT 2  // the fan retranslation (Script = Retrans)
+// puts back the built DRA's bytes and pointers over all RT writes: Default
+// after RT is this, then the dub's pack
+#define MOD_TEXT_PACK_RESTORE 3
+#define MOD_TEXT_PACKS 4 // directory slots in a chunk
 #define MOD_TEXT_PACK_DUB()                                                    \
     (MOD_PSP_DUB_ON() ? MOD_TEXT_PACK_PSP : MOD_TEXT_PACK_PS1)
-// TODO(retranslation): MOD_SCRIPT_RETRANS() picks MOD_TEXT_PACK_RT once
-// text_packs.py builds it; until then Script "Retrans" applies the dub's pack
-// (no visible change)
+// The retranslation pack exists only when the builder had the patched
+// Japanese disc's files (disks/jpre, mods/sotn-ultimate/tools/text_rt.py):
+// MOD_TEXT_RT_ON, in a header text_packs.py --header makes before the
+// compile. Without it Script = Retrans shows the dub's text.
+// MOD_TEXT_RT_READY (text_pack.h) is that and SD/TXT_RT.BIN in lba_us.h.
+#include "mod_text_rt.h"
 #define MOD_TEXT_PACK_WANTED()                                                 \
-    (MOD_SCRIPT_RETRANS() ? MOD_TEXT_PACK_DUB() : MOD_TEXT_PACK_DUB())
+    (MOD_TEXT_RT_READY && MOD_SCRIPT_RETRANS() ? MOD_TEXT_PACK_RT              \
+                                               : MOD_TEXT_PACK_DUB())
 // g_ModDub.textPack: the pack applied (0: none or half applied)
 #define MOD_TEXT_TAG(pack) (0x54585400 | (pack))
 // The chunks: 8 KB (one DRA CdFile_DemoKey read: 4 sectors to DEMO_KEY_PTR
@@ -368,6 +375,14 @@ typedef struct {
     ((ST_SEL_BIN_OFF + MOD_TEXT_SECTOR - MOD_TEXT_DEMOKEY_LBA) / 4)
 #define MOD_TEXT_SEL_CHUNK(c)                                                  \
     ((const u8*)(0x80180000 + (MOD_TEXT_SECTOR + 4 * (c)) * 0x800))
+// The RT pack's chunks: SD/TXT_RT.BIN, the last file on the disc (no other
+// file moves), read by the same CdFile_DemoKey entry: chunk 0 at its first
+// sector whose distance to DEMOKEY is a multiple of 4 (text_packs.py
+// rt_layout), each chunk in 4 whole sectors. SEL reads it at the start of an
+// RT game (ModTextReady), the System popup when the Script row changes.
+#define MOD_TEXT_RT_FIRST ((MOD_TEXT_DEMOKEY_LBA - OFF_SD_TXT_RT) & 3)
+#define MOD_TEXT_RT_CD_IDX                                                     \
+    ((OFF_SD_TXT_RT + MOD_TEXT_RT_FIRST - MOD_TEXT_DEMOKEY_LBA) / 4)
 // The overflow rooms in g_ModDub (resident in every game: DRA's BSS) for
 // strings that do not fit in place; text_packs.py fills them in this order
 // (A first: the old fixed-text room, so the PS1 / PSP packs' strings keep

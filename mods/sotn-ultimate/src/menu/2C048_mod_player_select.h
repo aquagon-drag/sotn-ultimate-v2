@@ -167,32 +167,108 @@ static const ModJpDubTable g_ModJpDubTable MOD_RO = {
 // filled after the link by text_packs.py --apply) and applied when it is not
 // the one applied (DRA's strings and g_ModDub stay as they are from one game
 // to the next). Every frame SEL's menu runs, so every way into a game; the
-// System screen's popup applies it in game (sysopt.c)
+// System screen's popup applies it in game (sysopt.c). The retranslation's
+// pack is on the disc (SD/TXT_RT.BIN): ModTextReady reads it when a game
+// starts (it holds the fade's end until it is applied)
 #include "text_pack.h"
 // where the chunks are (a word, so check_text_packs.py reads what runs)
 const u8* const g_ModTextSelChunk __attribute__((section(".rodata"))) =
     MOD_TEXT_SEL_CHUNK(0);
-static void ModTextSel(void) {
-    s32 pack = MOD_TEXT_PACK_WANTED();
+// one pack from SEL's copy (0: a chunk failed its check)
+static s32 ModTextSelRun(s32 pack) {
     const u8* c = g_ModTextSelChunk;
     s32 i;
 
-    if (MOD_DUB_STATE->textPack == MOD_TEXT_TAG(pack)) {
-        return;
-    }
-    MOD_DUB_STATE->textPack = 0;
     for (i = 0;; i++, c += MOD_TEXT_CHUNK_LEN) {
         // (a build without the packs: SEL's retail bytes, nothing applied)
-        if (!ModTextChunkOk(c) || c[8] != i) {
-            return;
+        if (!ModTextChunkOk(c, i)) {
+            return 0;
         }
         ModTextRun(c, pack);
         if (i + 1 >= c[9]) {
-            break;
+            return 1;
         }
     }
-    MOD_DUB_STATE->textPack = MOD_TEXT_TAG(pack);
 }
+// the dub's pack, after the restore pack when the RAM is not a dub's
+// (retranslation, half applied, or nothing yet); the tags of PS1 (0) and
+// PSP (1) differ in bit 0 only
+static void ModTextSelDub(void) {
+    s32 pack = MOD_TEXT_PACK_DUB();
+    s32 tag = MOD_DUB_STATE->textPack;
+
+    if (tag == MOD_TEXT_TAG(pack)) {
+        return;
+    }
+    MOD_DUB_STATE->textPack = 0;
+    if (((tag & ~1) == MOD_TEXT_TAG(MOD_TEXT_PACK_PS1) ||
+         ModTextSelRun(MOD_TEXT_PACK_RESTORE)) &&
+        ModTextSelRun(pack)) {
+        MOD_DUB_STATE->textPack = MOD_TEXT_TAG(pack);
+    }
+}
+// (Script = Retrans: ModTextReady)
+#define MOD_TEXT_SEL_RT() (MOD_TEXT_RT_READY && MOD_SCRIPT_RETRANS())
+#define ModTextSel()                                                           \
+    if (!MOD_TEXT_SEL_RT())                                                    \
+    ModTextSelDub()
+#if MOD_TEXT_RT_READY
+#include <disk.h>
+// At the end of the fade into a game (new game, loaded game): with Script =
+// Retrans, the RT pack read through DRA's CdFile_DemoKey (as sysopt.c does:
+// g_LoadOvlIdx = MOD_TEXT_RT_CD_IDX + chunk, buffer DEMO_KEY_PTR, which only
+// the title's demos use) and applied chunk by chunk; 0 until it is. A chunk
+// that fails its check (the CD layer has retried its sectors already): the
+// dub's text instead (the restore pack undoes the chunks applied; Script =
+// Retrans then shows the dub's text, as a build without the retranslation)
+// (BSS, like the select's other state: SEL's .data must keep its layout,
+// psp_script.py patches it at fixed offsets)
+static s32 g_ModTextCd;    // 1 + the chunk on its way
+static s32 g_ModTextCdOvl; // g_LoadOvlIdx before the load
+// (a word, so check_text_packs.py reads what runs)
+const s32 g_ModTextRtCdIdx __attribute__((section(".rodata"))) =
+    MOD_TEXT_RT_CD_IDX;
+#define TEXT_CD_BUF ((const u8*)0x801E8000) // DEMO_KEY_PTR
+static s32 ModTextReady(void) {
+    const u8* b = TEXT_CD_BUF;
+    s32 c;
+
+    if (!MOD_TEXT_SEL_RT() ||
+        MOD_DUB_STATE->textPack == MOD_TEXT_TAG(MOD_TEXT_PACK_RT)) {
+        return 1;
+    }
+    if (g_CdStep != CdStep_None || g_IsUsingCd) {
+        return 0;
+    }
+    // (a chunk on its way: g_LoadOvlIdx still names it; SEL's BSS is not
+    // cleared when the overlay loads, so g_ModTextCd alone could be stale)
+    c = g_ModTextCd - 1;
+    g_ModTextCd = 0;
+    if (g_LoadOvlIdx == g_ModTextRtCdIdx + c) {
+        g_LoadOvlIdx = g_ModTextCdOvl;
+        if (!ModTextChunkOk(b, c)) {
+            ModTextSelDub();
+            return 1;
+        }
+        ModTextRun(b, MOD_TEXT_PACK_RT);
+        if (++c >= b[9]) {
+            MOD_DUB_STATE->textPack = MOD_TEXT_TAG(MOD_TEXT_PACK_RT);
+            return 1;
+        }
+    } else {
+        MOD_DUB_STATE->textPack = 0; // (until its last chunk is applied)
+        g_ModTextCdOvl = g_LoadOvlIdx;
+        c = 0;
+    }
+    g_LoadOvlIdx = g_ModTextRtCdIdx + c;
+    g_LoadFile = CdFile_DemoKey;
+    g_CdStep = CdStep_LoadInit;
+    g_ModTextCd = c + 1;
+    return 0;
+}
+#else
+#define ModTextReady() 1
+#endif
 
 static void ModJpDubCopy(void) {
     const u32* s = (const u32*)&g_ModJpDubTable;

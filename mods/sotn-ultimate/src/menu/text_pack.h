@@ -19,10 +19,21 @@
 //   {u16 2, u16 n, u32 slots, u32 base, n x {u16 word, u16 off}}: the
 //       pointer at slots + 4 * word becomes base + off
 //   {u16 0, u16 0}: the end of the pack's records in this chunk
-// A pack's records cover every byte and pointer that any pack writes, so
-// applying one gives the same RAM whatever was applied before; one spread
-// over several chunks is applied chunk by chunk, in order.
+// The PS1 / PSP packs cover every byte and pointer either writes; the RT
+// pack covers all those and its own, so applying it gives the same RAM
+// whatever was applied before; the restore pack puts the built DRA's values
+// back over everything RT writes, so restore + a dub's pack does too. A pack
+// spread over several chunks is applied chunk by chunk, in order.
 #include <lba.h>
+// (the first compile, before make disk has put SD/TXT_RT.BIN in lba_us.h)
+#if defined(OFF_SD_TXT_RT) && MOD_TEXT_RT_ON
+#define MOD_TEXT_RT_READY 1
+#else
+#define MOD_TEXT_RT_READY 0
+#endif
+#ifndef OFF_SD_TXT_RT
+#define OFF_SD_TXT_RT 0
+#endif
 
 // (STATIC_ASSERT is empty on the PS1 builds: a negative array size fails)
 typedef char ModTextLayout[sizeof(ModDubState) == 4096 &&
@@ -36,16 +47,16 @@ typedef char ModTextLayout[sizeof(ModDubState) == 4096 &&
                                ? 1
                                : -1];
 
-// the chunk's header and sum are right (a buffer the CD did not fill, or
-// that something else wrote, is not applied)
-static s32 ModTextChunkOk(const u8* c) {
+// the chunk's header and sum are right and it is chunk i (a buffer the CD
+// did not fill, or that something else wrote, is not applied)
+static s32 ModTextChunkOk(const u8* c, s32 i) {
     const u16* h = (const u16*)c;
     const u16* w;
     u32 sum = 0;
     s32 size = h[2];
 
-    if (*(const u32*)c != MOD_TEXT_MAGIC || size > MOD_TEXT_CHUNK_LEN ||
-        size < 0x18) {
+    if (*(const u32*)c != MOD_TEXT_MAGIC || c[8] != i ||
+        size > MOD_TEXT_CHUNK_LEN || size < 0x18) {
         return 0;
     }
     for (w = h + 4; w < (const u16*)(c + size); w++) {
