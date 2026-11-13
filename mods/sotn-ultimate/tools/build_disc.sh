@@ -46,6 +46,8 @@ rm -f build/us/cc1_errors.log
 LBA_BEFORE=$(sha1sum include/lba_us.h 2>/dev/null || true)
 
 python3 mods/sotn-ultimate/tools/gen_mod_layouts.py
+# the staff roll of Ending = PSP (SEL's dead config copy, config_us.c)
+python3 mods/sotn-ultimate/tools/gen_credits_psp.py
 # the Cursed Prison's doors in NO4 / NO0 (room table copies, doorway tiles)
 python3 mods/sotn-ultimate/tools/gen_prs_links.py
 # the Saturn's familiar card placements (NO2, ARE layouts, in place)
@@ -359,6 +361,7 @@ done < build/us/mod/sysopt/syms.txt
 echo "OK   sysopt DRA symbols ($(wc -l < build/us/mod/sysopt/syms.txt)), ARC_F2.BIN $(stat -c %s build/us/ARC_F2.BIN) bytes"
 bash mods/sotn-ultimate/tools/check_no_dirt.sh
 python3 mods/sotn-ultimate/tools/check_stage_data.py
+python3 mods/sotn-ultimate/tools/check_credits_roll.py --build
 if [ "$MOD_PSP_DUB" = 1 ]; then
     python3 mods/sotn-ultimate/tools/check_psp_dub.py
 fi

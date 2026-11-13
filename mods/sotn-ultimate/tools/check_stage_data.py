@@ -117,6 +117,17 @@ for name, retail_path in STAGES.items():
         for off, size in json.load(open("build/us/text_packs.json"))["sel_edits"]:
             assert 0x25FC <= off and off + size <= 0x25FC + 0x7F10, (off, size)
             edited.append((off, off + size))
+    # the staff roll of Ending = PSP (cutscene_credits_psp, built by
+    # mods/sotn-ultimate/tools/gen_credits_psp.py): the first
+    # MOD_CREDITS_PSP_AREA bytes of that copy; check_credits_roll.py --build
+    # checks their contents
+    if name == "stsel":
+        m = re.search(r"0x([0-9a-f]+)\s+cutscene_credits_psp\n", text)
+        assert m, "no cutscene_credits_psp in stsel.map"
+        area = int(re.search(r"#define MOD_CREDITS_PSP_AREA (\w+)", open("mods/sotn-ultimate/include/game_mod.h").read())[1], 0)
+        off = int(m[1], 16) - base
+        assert off == 0x25FC, hex(off)
+        edited.append((off, off + area))
     bad = []
     for i in range(0, n, 4):
         if retail[i : i + 4] == built[i : i + 4]:

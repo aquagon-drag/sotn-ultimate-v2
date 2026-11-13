@@ -51,8 +51,9 @@ OUT_JSON = os.path.join(BUILD, "text_packs.json")
 DRA_BASE = 0x800A0000
 SEL_BASE = 0x80180000
 # SEL's dead copy of DRA's config tables (src/st/sel/config_us.c): file
-# offsets [0x25FC, 0x25FC + 0x7F10)
-DEAD_START, DEAD_END = 0x25FC, 0x25FC + 0x7F10
+# offsets [0x25FC, 0x25FC + 0x7F10), the first MOD_CREDITS_PSP_AREA bytes of
+# it the staff roll of Ending = PSP (a live table: a reference to it is fine)
+DEAD_START, DEAD_END = 0x25FC + 0x5A0, 0x25FC + 0x7F10
 PACK_NAMES = {0: "PS1", 1: "PSP"}
 
 # tables: 0 g_EquipDefs (0x34 per record), 1 g_AccessoryDefs (0x20),

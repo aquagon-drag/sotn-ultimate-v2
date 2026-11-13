@@ -187,6 +187,26 @@
 #define MOD_ENDING_PSP() (MOD_STATUS_FLAGS2 & MOD_FLAG2_ENDING_PSP)
 #define MOD_SCRIPT_RETRANS() (MOD_STATUS_FLAGS2 & MOD_FLAG2_SCRIPT_RETRANS)
 #define MOD_SUBTITLES_ON() (MOD_STATUS_FLAGS2 & MOD_FLAG2_SUBTITLES)
+// Ending = PSP: the staff roll (src/st/sel/cutscene.c func_801B79D4) is the PS1
+// table without the three blocks that credit "I Am the Wind" (SEL's
+// cutscene_credits_psp, gen_credits_psp.py) and scrolls slower, to last as
+// long as "Mournful Serenade" (276.0 s). The PS1 roll counts ticks (76 a
+// line, +24 an ENTRY, +48 a SECTION, 1 px per 4 ticks); this one counts
+// pixels (the same 19 / +6 / +12 px, so the layout is the PS1's whatever the
+// speed) and one px takes 6, 5, 5, 5 ticks (5.25 on average, like the PSP's
+// own {6,5,6,5}); the END wait is in ticks (the roll does not scroll then).
+// tools/check_credits_roll.py simulates both rolls and parses these.
+#define MOD_CREDITS_PSP_LINE 19
+#define MOD_CREDITS_PSP_ENTRY 6
+#define MOD_CREDITS_PSP_SECTION 12
+#define MOD_CREDITS_PSP_PERIOD_LONG 6
+#define MOD_CREDITS_PSP_PERIOD_SHORT 5
+#define MOD_CREDITS_PSP_END_TICKS 1474
+// where the table lives: SEL's dead config copy (src/st/sel/config_us.c) from
+// file offset 0x25FC, MOD_CREDITS_PSP_AREA bytes reserved (the table is 1397;
+// gen_credits_psp.py / the build refuse a bigger one). The text packs start at
+// 0x3000, so 0x25FC + AREA .. 0x3000 stays free.
+#define MOD_CREDITS_PSP_AREA 0x5A0
 // Saturn port: Alucard sprinting with the Godspeed Shoes (his sprint runs
 // in player step 0x13 = Player_FlameWhip, the same number as on the
 // Saturn). The Saturn's doors open in that step too (warp 0x060DEEB8).
@@ -331,7 +351,7 @@ typedef struct {
 #define MOD_TEXT_TAG(pack) (0x54585400 | (pack))
 // The chunks: 8 KB (one DRA CdFile_DemoKey read: 4 sectors to DEMO_KEY_PTR
 // 0x801E8000) in SEL.BIN's dead copy of DRA's config tables (file offset
-// 0x25FC-0xA50C, src/st/sel/config_us.c), written there after the link
+// 0x25FC-0xA50C, src/st/sel/config_us.c; its first MOD_CREDITS_PSP_AREA bytes are the Ending = PSP staff roll), written there after the link
 // (text_packs.py --apply). The first at the first whole sector of that copy
 // whose distance to BIN/DEMOKEY.BIN (src/dra/cd.c g_LbaBinDemokey,
 // check_cd_lba.py) is a multiple of 4: CdFile_DemoKey reads sector loc +
@@ -340,7 +360,7 @@ typedef struct {
 #define MOD_TEXT_MAGIC 0x4B505854 // "TXPK"
 #define MOD_TEXT_CHUNK_LEN 0x2000
 #define MOD_TEXT_DEMOKEY_LBA 0x7415
-#define MOD_TEXT_BLOB_FIRST 5 // (0x25FC + 0x7FF) / 0x800
+#define MOD_TEXT_BLOB_FIRST 6 // (0x25FC + MOD_CREDITS_PSP_AREA + 0x7FF) / 0x800
 #define MOD_TEXT_SECTOR                                                        \
     (MOD_TEXT_BLOB_FIRST +                                                     \
      ((MOD_TEXT_DEMOKEY_LBA - ST_SEL_BIN_OFF - MOD_TEXT_BLOB_FIRST) & 3))

@@ -7,9 +7,24 @@
 // every address after it stay retail) and drops their strings, ~15 KB of
 // rodata: room for the PSP dub toggle (the ending's PSP script copy, the
 // select screen's dub row)
+//
+// Its first MOD_CREDITS_PSP_AREA bytes hold the staff roll of Ending = PSP
+// (cutscene_credits_psp, build/us/credits_psp.bin from gen_credits_psp.py);
+// the rest are the retail bytes, and the text packs go in after the link at
+// file offset 0x3000 (text_packs.py)
+#define STR2(x) #x
+#define STR(x) STR2(x)
 __asm__(".pushsection .data\n"
         ".balign 4\n"
-        ".incbin \"disks/us/ST/SEL/SEL.BIN\", 0x25FC, 0x7F10\n"
+        ".global cutscene_credits_psp\n"
+        "cutscene_credits_psp:\n"
+        ".incbin \"build/us/credits_psp.bin\"\n"
+        ".if . - cutscene_credits_psp > " STR(MOD_CREDITS_PSP_AREA) "\n"
+        ".error \"credits_psp.bin outgrew MOD_CREDITS_PSP_AREA\"\n"
+        ".endif\n"
+        ".space " STR(MOD_CREDITS_PSP_AREA) " - (. - cutscene_credits_psp)\n"
+        ".incbin \"disks/us/ST/SEL/SEL.BIN\", 0x25FC + " STR(
+            MOD_CREDITS_PSP_AREA) ", 0x7F10 - " STR(MOD_CREDITS_PSP_AREA) "\n"
         ".popsection");
 #else
 #include "../../config_us.h"
