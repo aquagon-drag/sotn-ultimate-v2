@@ -60,6 +60,9 @@ src/st/sel/mod_jp_xa.h
 src/st/lib/mod_bestiary.h
 src/dra/mod_psp_xa.h
 src/dra/mod_xa_music.h
+# the retranslation pack's switch (text_packs.py --header: whether the
+# builder had disks/jpre, the patched Japanese disc's files)
+mods/sotn-ultimate/include/mod_text_rt.h
 # the builder: its bundle, and pages with a patch in them
 mods/sotn-ultimate/tools/builder/dist/
 mods/sotn-ultimate/tools/builder/web/*.generated.html

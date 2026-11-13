@@ -1,0 +1,24 @@
+# Wording decisions for the retranslation pack (Script = Retrans).
+#
+# Copy this file to disks/jpre/rt_overrides.tsv (gitignored: it holds
+# translation text) and add one line per entry, TAB-separated:
+#
+#   table   index   field   action  [text]
+#
+# table:  equip acc relic spell enemy menu help   (the mod's tables)
+# index:  the mod's index (decimal or 0x..), as in the fit report
+# field:  name / desc (equip, acc, relic, spell), name (enemy), str (menu, help)
+# action: rt    the retranslation's text as it is, even where it does not fit
+#         us    the US (mod) text
+#         text  your own wording, in the fifth column (plain text; quotes,
+#               digits and punctuation are converted for the US renderers;
+#               accented letters become plain ones)
+#
+# Without a line an entry gets the build's provisional choice: the
+# retranslation where it fits, else the US text (see the fit report:
+# mods/sotn-ultimate/tools/text_rt.py --report <file outside the repository>).
+#
+# Examples (not real decisions):
+# equip	40	name	text	Strawberry Pie
+# acc	47	name	us
+# relic	22	name	rt

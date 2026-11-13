@@ -24,6 +24,10 @@ def read_src(path):
         m = re.match(r"^\s*#\s*include\s+\"([^\"]+)\"", line)
         if m:
             tgt = os.path.normpath(os.path.join(os.path.dirname(full), m.group(1)))
+            # (a generated header not made yet, e.g. include/mod_text_rt.h
+            # before text_packs.py --header: left out)
+            if tgt.startswith(os.path.join(ROOT, "mods", "sotn-ultimate") + os.sep) and not os.path.exists(tgt):
+                continue
             if tgt.startswith(os.path.join(ROOT, "mods", "sotn-ultimate") + os.sep):
                 out.append(read_src(os.path.relpath(tgt, ROOT)))
                 continue
