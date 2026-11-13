@@ -134,7 +134,7 @@ static const char* D_us_80180FB4[] = {
     "Fire and ice demon．@Seems reluctant to fight．",
     "Skeleton archer equipped @with bow．",
 #if defined(MOD_SATURN)
-    // the PSP port's text (mods/sotn-ultimate/tools/gen_menu_text.py lists the
+    // the PSP port's text (mods/sotn-ultimate/tools/text_packs.py lists the
     // menu changes)
     "Pillar built from bleached@skull of dragon．",
 #else

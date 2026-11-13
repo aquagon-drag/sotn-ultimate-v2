@@ -262,7 +262,7 @@ void DebugCaptureVideo(void) {
 // the difference between the bytes the mod adds and the bytes it drops.
 // mods/sotn-ultimate/tools/check_dra_layout.sh prints the value to use after a
 // build.
-#define MOD_DRA_PAD 24
+#define MOD_DRA_PAD 184
 const u8 g_ModDraPad[MOD_DRA_PAD] = {1};
 #endif
 

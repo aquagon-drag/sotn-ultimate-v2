@@ -56,7 +56,6 @@ src/**/mod_*_sfx.h
 src/st/no3/mod_horse.h
 src/st/sel/mod_charsel_gfx.h
 src/st/sel/mod_sel_soundmode_gfx.h
-src/st/sel/mod_dub_text.h
 src/st/sel/mod_jp_xa.h
 src/st/lib/mod_bestiary.h
 src/dra/mod_psp_xa.h

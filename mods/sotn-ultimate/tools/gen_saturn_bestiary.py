@@ -56,7 +56,7 @@ DESC = {  # fan translation; fitted to the PS1 detail box (2 lines, each
 }
 
 # The cut Outer Wall skull (enemy record 0xB1, include/game.h
-# MOD_OUTER_WALL_GHOST, named "Ghost Skull" by mods/sotn-ultimate/tools/gen_menu_text.py):
+# MOD_OUTER_WALL_GHOST, named "Ghost Skull" by mods/sotn-ultimate/tools/text_packs.py):
 # only with the toggle, one more entry at the END of the list (No.165) with
 # the next free bestiary bit (164: g_CastleFlags 0x1A4 / rare drop 0x1C4,
 # mask 0x10); NO1's collision (src/st/collision.h) sets it. Its picture is

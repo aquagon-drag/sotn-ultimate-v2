@@ -255,6 +255,66 @@ static void SysOptBanks(void) {
     g_CdStep = CdStep_LoadInit;
 }
 
+// DRA's names and descriptions follow the Dub (and, later, the Script) row:
+// the text pack (include/game_mod.h MOD_TEXT_*, the applier in
+// text_pack.h, as SEL applies it at every game start / load). Its chunks are
+// in SEL.BIN's dead config copy on the disc; DRA's CdFile_DemoKey entry
+// (g_LbaBinDemokey: sector 0x7415 + 4 * g_LoadOvlIdx, 0x2000 bytes, copied
+// to DEMO_KEY_PTR by its callback; only the title's demos use it) reads one
+// with g_LoadOvlIdx = g_ModTextCdIdx + chunk, so no CdFile entry changes.
+// Started as soon as the wanted pack is not the one applied (the box open or
+// closed: the bank loads below wait for the CD); applied on the first frame
+// the CD is idle again. g_LoadOvlIdx (set before every load by whoever loads)
+// gets its value back. The pack is latched: a change made meanwhile loads
+// again after. A chunk that fails the check is not applied (twice: given up
+// until the next game load). If the menu is left before the load ends, the
+// text changes the next time the System screen shows (or at SEL)
+#include "text_pack.h"
+#define TEXT_BUF ((const u8*)0x801E8000) // DEMO_KEY_PTR
+// (a word, so check_text_packs.py reads what runs)
+const s32 g_ModTextCdIdx = MOD_TEXT_CD_IDX;
+static s32 g_TextLoad = 0;  // 1 + the chunk on its way (0: none)
+static s32 g_TextPack = 0;  // the pack being applied
+static s32 g_TextOvl = 0;   // g_LoadOvlIdx before the load
+static s32 g_TextFails = 0; // chunks that failed the check
+static void SysOptText(void) {
+    s32 c;
+
+    if (g_TextLoad) {
+        if (g_CdStep != CdStep_None || g_IsUsingCd) {
+            return;
+        }
+        c = g_TextLoad - 1;
+        g_TextLoad = 0;
+        if (g_LoadOvlIdx == g_ModTextCdIdx + c) {
+            g_LoadOvlIdx = g_TextOvl;
+        }
+        if (!ModTextChunkOk(TEXT_BUF) || TEXT_BUF[8] != c) {
+            g_TextFails++;
+            return;
+        }
+        ModTextRun(TEXT_BUF, g_TextPack);
+        if (c + 1 >= TEXT_BUF[9]) {
+            MOD_DUB_STATE->textPack = MOD_TEXT_TAG(g_TextPack);
+            return;
+        }
+        c++; // its next chunk
+    } else {
+        if (MOD_DUB_STATE->textPack == MOD_TEXT_TAG(MOD_TEXT_PACK_WANTED()) ||
+            g_TextFails >= 2 || g_CdStep != CdStep_None || g_IsUsingCd) {
+            return;
+        }
+        g_TextPack = MOD_TEXT_PACK_WANTED();
+        MOD_DUB_STATE->textPack = 0; // (until its last chunk is applied)
+        c = 0;
+    }
+    g_TextOvl = g_LoadOvlIdx;
+    g_LoadOvlIdx = g_ModTextCdIdx + c;
+    g_LoadFile = CdFile_DemoKey;
+    g_CdStep = CdStep_LoadInit;
+    g_TextLoad = c + 1;
+}
+
 // The box's input, while g_MenuStep is MOD_STEP_BOX: only when it is fully
 // open (Up / Down pick, Left / Right / X change, Triangle / Circle close)
 static void PopInput(MenuContext* pop) {
@@ -312,6 +372,7 @@ void ModSysOptBox(MenuContext* ctx, s32 cursorIdx, s32 x, s32 y, s32 w, s32 h,
                   s32 yGap, s32 bColorMode) {
     MenuContext* pop = &g_Menus[MENU_DG_CFG_SOUND];
 
+    SysOptText(); // (first: the bank loads wait for it)
     if (g_MenuStep == MOD_STEP_BOX) {
         if (pop->cursorW != POP_W || pop->unk1C == 2) {
             PopReset(pop); // closed: back to the System list

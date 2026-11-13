@@ -307,53 +307,69 @@ typedef struct {
     // per set bit: sector - xaBase (bits 0-14), unk228 (15-25), file (26-31)
     u32 xa[MOD_JP_XA_MAX];
 } ModJpDubTable;
-// The menu text that follows the Dub row
-// (mods/sotn-ultimate/tools/gen_menu_text.py): SEL copies each string's DRA
-// address and both versions (PS1, then PSP padded to the PS1 length) here;
-// DRA's ModApplyDubText writes the chosen one over the string every frame of
-// play (src/dra/game_handlers.c)
-#define MOD_DUB_TEXT_MAGIC 0x54585455
-#define MOD_DUB_TEXT_MAX 16
-#define MOD_DUB_TEXT_BYTES 384
-#define MOD_FIXED_TEXT_BYTES 768
-typedef struct {
-    // bits 0-2: the table (0 equipment, 1 accessories, 2 enemies, 3 relics,
-    // 4 g_MenuStr); bits 3-7: where in the string the versions differ
-    u8 table;
-    u16 off; // byte offset of the string's pointer in that table
-    u8 len;  // bytes of the differing span
-} ModDubTextSrc;
-typedef struct {
-    u8 table; // as ModDubTextSrc
-    u8 pos;   // where in DRA's retail string the edit starts
-    u16 off;  // byte offset of the string's pointer in that table
-    u8 del;   // bytes dropped there (0xFF: the string is the inserted bytes)
-    u8 ins;   // bytes inserted there (g_ModFixedTextBytes, in order)
-    u8 room;  // its room in g_ModDub.fixedText
-} ModFixedTextSrc;
-typedef struct {
-    u32 magic;
-    u32 count;
-    struct {
-        u8* dst;
-        const u8* src[2]; // the PS1 version, the PSP one
-        u32 len;
-    } e[MOD_DUB_TEXT_MAX];
-    u8 bytes[MOD_DUB_TEXT_BYTES];
-} ModDubText;
-// DRA's dead VSync-effect buffers (4 KB, src/dra/47BB8.c)
+// Text packs (mods/sotn-ultimate/tools/text_packs.py, applier
+// mods/sotn-ultimate/src/menu/text_pack.h): DRA's names and descriptions for
+// one script. A pack is a whole state over the bytes and pointers any pack
+// touches: copies over DRA's own string pool (in place) or into the overflow
+// rooms below, and table pointers. SEL applies the chosen one when it differs
+// from the one applied (every frame its menu runs, so every way into a game);
+// in Alucard games the System screen's popup applies it when the Dub or
+// Script row changes (mods/sotn-ultimate/src/menu/sysopt.c). DRA has no code
+// for it.
+#define MOD_TEXT_PACK_PS1 0 // the PS1 script (the PS1 dub)
+#define MOD_TEXT_PACK_PSP 1 // the PSP script (the PSP and JP dubs)
+#define MOD_TEXT_PACK_RT 2  // reserved: the fan retranslation (not built yet)
+#define MOD_TEXT_PACKS 4    // directory slots in a chunk
+#define MOD_TEXT_PACK_DUB()                                                    \
+    (MOD_PSP_DUB_ON() ? MOD_TEXT_PACK_PSP : MOD_TEXT_PACK_PS1)
+// TODO(retranslation): MOD_SCRIPT_RETRANS() picks MOD_TEXT_PACK_RT once
+// text_packs.py builds it; until then Script "Retrans" applies the dub's pack
+// (no visible change)
+#define MOD_TEXT_PACK_WANTED()                                                 \
+    (MOD_SCRIPT_RETRANS() ? MOD_TEXT_PACK_DUB() : MOD_TEXT_PACK_DUB())
+// g_ModDub.textPack: the pack applied (0: none or half applied)
+#define MOD_TEXT_TAG(pack) (0x54585400 | (pack))
+// The chunks: 8 KB (one DRA CdFile_DemoKey read: 4 sectors to DEMO_KEY_PTR
+// 0x801E8000) in SEL.BIN's dead copy of DRA's config tables (file offset
+// 0x25FC-0xA50C, src/st/sel/config_us.c), written there after the link
+// (text_packs.py --apply). The first at the first whole sector of that copy
+// whose distance to BIN/DEMOKEY.BIN (src/dra/cd.c g_LbaBinDemokey,
+// check_cd_lba.py) is a multiple of 4: CdFile_DemoKey reads sector loc +
+// 4 * g_LoadOvlIdx, so g_LoadOvlIdx = MOD_TEXT_CD_IDX + chunk and no CdFile
+// changes. SEL reads them in its own RAM (MOD_TEXT_SEL_CHUNK).
+#define MOD_TEXT_MAGIC 0x4B505854 // "TXPK"
+#define MOD_TEXT_CHUNK_LEN 0x2000
+#define MOD_TEXT_DEMOKEY_LBA 0x7415
+#define MOD_TEXT_BLOB_FIRST 5 // (0x25FC + 0x7FF) / 0x800
+#define MOD_TEXT_SECTOR                                                        \
+    (MOD_TEXT_BLOB_FIRST +                                                     \
+     ((MOD_TEXT_DEMOKEY_LBA - ST_SEL_BIN_OFF - MOD_TEXT_BLOB_FIRST) & 3))
+#define MOD_TEXT_CD_IDX                                                        \
+    ((ST_SEL_BIN_OFF + MOD_TEXT_SECTOR - MOD_TEXT_DEMOKEY_LBA) / 4)
+#define MOD_TEXT_SEL_CHUNK(c)                                                  \
+    ((const u8*)(0x80180000 + (MOD_TEXT_SECTOR + 4 * (c)) * 0x800))
+// The overflow rooms in g_ModDub (resident in every game: DRA's BSS) for
+// strings that do not fit in place; text_packs.py fills them in this order
+// (A first: the old fixed-text room, so the PS1 / PSP packs' strings keep
+// their step 3 addresses)
+#define MOD_TEXT_OVF_A_OFF 1872
+#define MOD_TEXT_OVF_A_LEN 768
+#define MOD_TEXT_OVF_B_OFF 1228
+#define MOD_TEXT_OVF_B_LEN 644
+#define MOD_TEXT_OVF_C_OFF 2644
+#define MOD_TEXT_OVF_C_LEN 1452
+// DRA's dead VSync-effect buffers (4 KB, src/dra/47BB8.c), at a fixed address
+// (SEL, sysopt and save_mgr.h use it; check_psp_dub.py checks it)
+#define MOD_DUB_STATE ((ModDubState*)0x8013644C)
 typedef struct {
     u32 cfg[4]; // ModXaConfig's redirected XaMusicConfig
     ModJpDubTable jp;
-    ModDubText text;
-    // the PSP port's fixed menu strings, which DRA's table entries point to
-    // (SEL copies them and sets the pointers:
-    // mods/sotn-ultimate/tools/gen_menu_text.py)
-    u8 fixedText[MOD_FIXED_TEXT_BYTES];
+    u32 textPack; // MOD_TEXT_TAG of the text pack applied
+    u8 textOvfB[MOD_TEXT_OVF_B_LEN];
+    u8 textOvfA[MOD_TEXT_OVF_A_LEN];
     // DRA's StoreSaveData, set every frame (game_handlers.c UpdateGame):
     // SEL's saves go through it (save_mgr.h)
     void* storeSave;
-    u8 unused[4096 - 16 - sizeof(ModJpDubTable) - sizeof(ModDubText) -
-              MOD_FIXED_TEXT_BYTES - sizeof(void*)];
+    u8 textOvfC[MOD_TEXT_OVF_C_LEN];
 } ModDubState;
 extern ModDubState g_ModDub;

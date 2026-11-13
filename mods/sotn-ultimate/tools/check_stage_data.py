@@ -110,6 +110,13 @@ for name, retail_path in STAGES.items():
     for off, size in PSP_EDITS.get(name, []):
         # word-aligned cover of the range (the check walks words)
         edited.append((off & ~3, off + size))
+    # the text packs' chunks in SEL's dead config copy
+    # (mods/sotn-ultimate/tools/text_packs.py --apply; their contents and
+    # that nothing else in SEL refers to that copy: check_text_packs.py)
+    if name == "stsel" and os.path.exists("build/us/text_packs.json"):
+        for off, size in json.load(open("build/us/text_packs.json"))["sel_edits"]:
+            assert 0x25FC <= off and off + size <= 0x25FC + 0x7F10, (off, size)
+            edited.append((off, off + size))
     bad = []
     for i in range(0, n, 4):
         if retail[i : i + 4] == built[i : i + 4]:

@@ -62,27 +62,3 @@ static void ModApplyBalance(void) {
     }
 }
 
-// Saturn port: the menu text that follows the Dub row (PSP text with the PSP
-// and JP dubs, the PS1's with the PS1 dub;
-// mods/sotn-ultimate/tools/gen_menu_text.py). SEL leaves both versions of each
-// string and its address in g_ModDub.text; the chosen one is written over the
-// string every frame of play, as the balance above (each fits the PS1 string's
-// bytes)
-static void ModApplyDubText(void) {
-    ModDubText* t = &g_ModDub.text;
-    const u8* s;
-    u8* d;
-    s32 i, n, psp;
-
-    if (t->magic != MOD_DUB_TEXT_MAGIC) {
-        return;
-    }
-    psp = MOD_PSP_DUB_ON();
-    for (i = 0; i < t->count; i++) {
-        d = t->e[i].dst;
-        s = t->e[i].src[psp];
-        for (n = t->e[i].len; n; n--) {
-            *d++ = *s++;
-        }
-    }
-}

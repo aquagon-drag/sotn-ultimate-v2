@@ -276,8 +276,9 @@ enemy and item records, and `MOD_DATA_PAD` keeps sound_data where it was.
   non-static) so the BSS keeps its retail layout. The two VSync line-upload
   buffers `D_80136460` / `D_80136C60` (4 KB) are only started by the removed
   sim-file loader. They become `ModDubState g_ModDub`
-  (`include/game.h`): the redirected XA config, the JP dub tables, the dub
-  menu text, and the `storeSave` pointer SEL saves through.
+  (`include/game.h`): the redirected XA config, the JP dub tables, the text
+  packs' tag and overflow rooms (2,864 bytes), and the `storeSave` pointer
+  SEL saves through.
 - Write-only globals that `MOD_DRA_STRIP` turns into locals (section 2.4) stay
   declared as globals, so their BSS slots stay. The local of the same name
   only saves the address loads.
@@ -368,6 +369,17 @@ DRA has no room for some features, so they live elsewhere:
   checks a magic word and then jumps to the popup code or to the retail
   function. maspsx adds nops around branches, so most of the stubs are raw
   `.word`s. `build_sysopt.sh` checks them.
+- **The text packs** (DRA's names and descriptions per script:
+  `include/game_mod.h` `MOD_TEXT_*`, `mods/sotn-ultimate/tools/text_packs.py`).
+  The chunks live in SEL's dead copy of DRA's config tables
+  (`src/st/sel/config_us.c`), filled after SEL's final link. SEL applies the
+  chosen pack from its own RAM at every game start and load; the System
+  popup (Alucard games) reads the same sectors from the disc through DRA's
+  `CdFile_DemoKey` entry (`g_LoadOvlIdx` picks the sector) into
+  `DEMO_KEY_PTR` and applies it when the Dub row changes. The applier is
+  `mods/sotn-ultimate/src/menu/text_pack.h`; DRA has no code for it.
+  `check_text_packs.py` checks the chunks in SEL and on the disc and proves
+  the PS1 / PSP packs equal the per-frame mechanism they replaced.
 - **The JP dub tables.** They are SEL rodata. SEL copies them into
   `g_ModDub.jp` every frame its menu runs, and every way into a game passes
   through there.
@@ -896,7 +908,7 @@ does the whole release:
 `mods/sotn-ultimate/tools/build_disc.sh` runs every generator, balances the DRA pads, builds
 the extra overlays and files, and runs `make disk`. It then runs the checks:
 `check_dra_layout.sh`, `check_cd_lba.py`, `check_no_dirt.sh`,
-`check_stage_data.py`, `check_status_shift.py`, `check_menu_text.py`,
+`check_stage_data.py`, `check_status_shift.py`, `check_text_packs.py`,
 `check_psp_dub.py`, `check_abs_syms.py`, `check_weapon_hands.py`. Output
 goes to `build/sotn_ultimate.bin` (or `$MOD_OUT`).
 

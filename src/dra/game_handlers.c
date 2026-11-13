@@ -420,7 +420,6 @@ void HandlePlay(void) {
 
 #if defined(MOD_SATURN)
     ModApplyBalance();
-    ModApplyDubText();
 #endif
 
     switch (g_GameStep) {

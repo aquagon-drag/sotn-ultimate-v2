@@ -154,7 +154,6 @@ static const char* const g_ModCharselOpts3[MOD_CHARSEL_PG2][2] MOD_RO = {
 // way into a game passes here, and DRA has no room for them
 #include "../../../../src/st/sel/mod_jp_xa.h"
 #include "../../../../src/st/sel/mod_jp_sfx.h"
-#define MOD_DUB_STATE ((ModDubState*)0x8013644C)
 static const ModJpDubTable g_ModJpDubTable MOD_RO = {
     MOD_JP_XA_COUNT ? MOD_JP_MAGIC : 0,
     MOD_JP_XA_BASE,
@@ -162,96 +161,37 @@ static const ModJpDubTable g_ModJpDubTable MOD_RO = {
     MOD_JP_SFX_PAIRS,
     MOD_JP_XA_BITS,
     MOD_JP_XA_WORDS};
-// The PSP port's menu text (mods/sotn-ultimate/tools/gen_menu_text.py; DRA's
-// tables stay retail). Fixed strings: copied into g_ModDub.fixedText, DRA's
-// entries pointed at them. Strings that follow the Dub row: their DRA address
-// (through g_api's tables; g_MenuStr at its address in DRA, checked by
-// mods/sotn-ultimate/tools/check_menu_text.py) and both versions, for src/dra/
-// game_handlers.c ModApplyDubText.
-#include "../../../../src/st/sel/mod_dub_text.h"
-#if defined(MOD_SATURN_STAGE_TEST)
-// test builds (dialogue warp chain): its teleports and stop table add 0x2C
-// bytes of DRA data before g_MenuStr
-#define MOD_MENU_STR ((u8*)0x800A83B8)
-#else
-#define MOD_MENU_STR ((u8*)0x800A838C)
-#endif
-static u8** ModTextSlot(s32 table, s32 off) {
-    u8* base;
+// DRA's names and descriptions for the chosen script: the text pack
+// (include/game_mod.h MOD_TEXT_*, mods/sotn-ultimate/tools/text_packs.py),
+// read from this overlay's own dead config copy (src/st/sel/config_us.c,
+// filled after the link by text_packs.py --apply) and applied when it is not
+// the one applied (DRA's strings and g_ModDub stay as they are from one game
+// to the next). Every frame SEL's menu runs, so every way into a game; the
+// System screen's popup applies it in game (sysopt.c)
+#include "text_pack.h"
+// where the chunks are (a word, so check_text_packs.py reads what runs)
+const u8* const g_ModTextSelChunk __attribute__((section(".rodata"))) =
+    MOD_TEXT_SEL_CHUNK(0);
+static void ModTextSel(void) {
+    s32 pack = MOD_TEXT_PACK_WANTED();
+    const u8* c = g_ModTextSelChunk;
+    s32 i;
 
-    switch (table) {
-    case 0:
-        base = (u8*)g_api.equipDefs;
-        break;
-    case 1:
-        base = (u8*)g_api.accessoryDefs;
-        break;
-    case 2:
-        base = (u8*)g_api.enemyDefs;
-        break;
-    case 3:
-        base = (u8*)g_api.relicDefs;
-        break;
-    default:
-        base = MOD_MENU_STR;
-        break;
+    if (MOD_DUB_STATE->textPack == MOD_TEXT_TAG(pack)) {
+        return;
     }
-    return (u8**)(base + off);
-}
-
-static void ModDubTextCopy(void) {
-    ModDubText* t = &MOD_DUB_STATE->text;
-    u8* fixed = MOD_DUB_STATE->fixedText;
-    const ModFixedTextSrc* f;
-    const ModDubTextSrc* e;
-    const u8* ins = g_ModFixedTextBytes;
-    const u8* s;
-    u8** slot;
-    u8* d;
-    s32 i, j, pos;
-
-    STATIC_ASSERT(MOD_DUB_TEXT_COUNT <= MOD_DUB_TEXT_MAX, "too many strings");
-    STATIC_ASSERT(MOD_DUB_TEXT_SIZE <= MOD_DUB_TEXT_BYTES, "too many bytes");
-    STATIC_ASSERT(MOD_FIXED_TEXT_SIZE <= MOD_FIXED_TEXT_BYTES, "fixed text");
-    for (i = 0, pos = 0; i < MOD_FIXED_TEXT_COUNT; i++) {
-        f = &g_ModFixedTextSrc[i];
-        slot = ModTextSlot(f->table, f->off);
-        d = &fixed[pos];
-        // built once: DRA (and so the pointer) stays until the console resets
-        if (*slot != d) {
-            s = *slot;
-            if (f->del != 0xFF) {
-                for (j = 0; j < f->pos; j++) {
-                    *d++ = *s++;
-                }
-                s += f->del;
-            }
-            for (j = 0; j < f->ins; j++) {
-                *d++ = ins[j];
-            }
-            if (f->del != 0xFF) {
-                do {
-                    *d++ = *s;
-                } while (*s++);
-            }
-            *slot = &fixed[pos];
+    MOD_DUB_STATE->textPack = 0;
+    for (i = 0;; i++, c += MOD_TEXT_CHUNK_LEN) {
+        // (a build without the packs: SEL's retail bytes, nothing applied)
+        if (!ModTextChunkOk(c) || c[8] != i) {
+            return;
         }
-        ins += f->ins;
-        pos += f->room;
+        ModTextRun(c, pack);
+        if (i + 1 >= c[9]) {
+            break;
+        }
     }
-    for (i = 0, pos = 0; i < MOD_DUB_TEXT_COUNT; i++) {
-        e = &g_ModDubTextSrc[i];
-        t->e[i].dst = *ModTextSlot(e->table & 7, e->off) + (e->table >> 3);
-        t->e[i].len = e->len;
-        t->e[i].src[0] = &t->bytes[pos];
-        t->e[i].src[1] = &t->bytes[pos + e->len];
-        pos += e->len * 2;
-    }
-    for (i = 0; i < MOD_DUB_TEXT_SIZE; i++) {
-        t->bytes[i] = g_ModDubTextBytes[i];
-    }
-    t->count = MOD_DUB_TEXT_COUNT;
-    t->magic = MOD_DUB_TEXT_MAGIC;
+    MOD_DUB_STATE->textPack = MOD_TEXT_TAG(pack);
 }
 
 static void ModJpDubCopy(void) {
@@ -262,7 +202,7 @@ static void ModJpDubCopy(void) {
     for (i = 0; i < sizeof(ModJpDubTable) / 4; i++) {
         d[i] = s[i];
     }
-    ModDubTextCopy();
+    ModTextSel();
 }
 #endif
 

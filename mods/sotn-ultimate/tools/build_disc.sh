@@ -68,9 +68,6 @@ $NODE --no-warnings mods/sotn-ultimate/tools/builder/node/cen_sounds.ts cen
 .venv/bin/python mods/sotn-ultimate/tools/port_saturn_icons.py
 python3 mods/sotn-ultimate/tools/gen_saturn_items.py
 python3 mods/sotn-ultimate/tools/gen_saturn_enemies.py
-# the PSP port's menu text picks: fixes in DRA's tables, and the strings that
-# follow the Dub row (SEL's src/st/sel/mod_dub_text.h; checked below)
-python3 mods/sotn-ultimate/tools/gen_menu_text.py
 # the Saturn Librarian enemy list: src/st/lib/mod_bestiary.h
 python3 mods/sotn-ultimate/tools/gen_saturn_bestiary.py
 # Saturn-only music: build/us/XA_STR1.unpacked (retail + new tracks),
@@ -299,12 +296,27 @@ fi
 # make disk relinks the overlays that include lba_us.h (SEL): patch them
 # again and remake the image (BO6, copied into BO6RIC2 above, must not be
 # among them: --check compares both)
+# The text packs (DRA's names and descriptions per script: the PSP port's
+# menu text picks; include/game_mod.h MOD_TEXT_*) go into SEL's dead config
+# copy after its final link too, from the final DRA's addresses (its strings
+# move with MOD_DRA_PAD); checked below by check_text_packs.py
+remake=
 if [ "$MOD_PSP_DUB" = 1 ]; then
     out=$(python3 mods/sotn-ultimate/tools/psp_script.py --apply)
     echo "$out"
     if echo "$out" | grep -q "BIN"; then
-        VERSION=us quiet ./sotn.sh disk
+        remake=1
     fi
+fi
+out=$(cd mods/sotn-ultimate/tools && python3 text_packs.py --apply)
+echo "$out"
+if echo "$out" | grep -q "(SEL.BIN)"; then
+    remake=1
+fi
+if [ -n "$remake" ]; then
+    VERSION=us quiet ./sotn.sh disk
+fi
+if [ "$MOD_PSP_DUB" = 1 ]; then
     python3 mods/sotn-ultimate/tools/psp_script.py --check
 fi
 # SELRIC2 from the final SEL (relinked and patched above)
@@ -351,7 +363,7 @@ if [ "$MOD_PSP_DUB" = 1 ]; then
     python3 mods/sotn-ultimate/tools/check_psp_dub.py
 fi
 python3 mods/sotn-ultimate/tools/check_status_shift.py | tail -1
-python3 mods/sotn-ultimate/tools/check_menu_text.py
+(cd mods/sotn-ultimate/tools && python3 check_text_packs.py)
 # splat's absolute addresses inside moved symbols (stale = broken asm
 # cutscenes; fix: check_abs_syms.py --write, then build again)
 python3 mods/sotn-ultimate/tools/check_abs_syms.py || true
