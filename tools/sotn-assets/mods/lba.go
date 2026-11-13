@@ -113,6 +113,8 @@ var miscEntries = []lbaEntry{
 	{"OFF_BIN_ARC_F2", "BIN/ARC_F2.BIN", lbaOffset},
 	// Saturn port mod: NO3's bank for Richter's / Maria's horse ride (mods/sotn-ultimate/tools/gen_no3_sounds.py)
 	{"OFF_BIN_NO3RIDE", "BIN/NO3RIDE.BIN", lbaOffset},
+	// SOTN Ultimate add-on: the retranslation's text pack, the last file on the disc (mods/sotn-ultimate/tools/text_packs.py)
+	{"OFF_SD_TXT_RT", "SD/TXT_RT.BIN", lbaOffset},
 	{"vab0Len", "SD_J010.VB", lbaSize},
 	{"SD_ALK_VH_LEN", "VAB/SD_ALK.VH", lbaSize},
 	{"SD_RIH_VH_LEN", "VAB/SD_RIH.VH", lbaSize},

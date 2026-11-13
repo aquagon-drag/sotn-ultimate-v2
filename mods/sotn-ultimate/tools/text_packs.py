@@ -54,7 +54,11 @@ SEL_BASE = 0x80180000
 # offsets [0x25FC, 0x25FC + 0x7F10), the first MOD_CREDITS_PSP_AREA bytes of
 # it the staff roll of Ending = PSP (a live table: a reference to it is fine)
 DEAD_START, DEAD_END = 0x25FC + 0x5A0, 0x25FC + 0x7F10
-PACK_NAMES = {0: "PS1", 1: "PSP"}
+PACK_NAMES = {0: "PS1", 1: "PSP", 2: "RT", 3: "restore"}
+PACK_RT, PACK_RESTORE = 2, 3
+# the retranslation pack's chunks: SD/TXT_RT.BIN, the last file on the disc
+RT_FILE = os.path.join(BUILD, "TXT_RT.BIN")
+RT_HEADER = os.path.join(ROOT, "mods/sotn-ultimate/include/mod_text_rt.h")
 
 # tables: 0 g_EquipDefs (0x34 per record), 1 g_AccessoryDefs (0x20),
 # 2 g_EnemyDefs (0x28), 3 g_RelicDefs (0x10), 4 g_MenuStr (4)
@@ -255,6 +259,160 @@ def footprint(recs):
     return bytes_, ptrs
 
 
+# --- the retranslation (text_rt.py) ----------------------------------------
+def rt_segments(ram, ents):
+    """the bytes the retranslation pack may rewrite in DRA: every string a
+    rewritten slot points to (the built DRA, no pack applied), merged over
+    the zero bytes that align them"""
+    ext = []
+    for e in ents:
+        p = ram.u32(e.slot)
+        ext.append([p, p + len(e.us) + len(e.term())])
+    ext.sort()
+    seg = []
+    for a, b in ext:
+        if seg and a <= seg[-1][1]:
+            seg[-1][1] = max(seg[-1][1], b)
+        elif seg and a - seg[-1][1] < 4 and ram.read(seg[-1][1], a - seg[-1][1]) == bytes(a - seg[-1][1]):
+            seg[-1][1] = b
+        else:
+            seg.append([a, b])
+    return [tuple(x) for x in seg]
+
+
+def foreign_refs(ram, syms, ents, segs, dra_len):
+    """data words and lui / addiu pairs of DRA (not the rewritten slots)
+    that point into segs: must be none"""
+    import bisect
+    import text_rt
+    slots = {e.slot for e in ents}
+    starts = [a for a, _ in segs]
+
+    def inside(v):
+        i = bisect.bisect_right(starts, v) - 1
+        return i >= 0 and segs[i][0] <= v < segs[i][1]
+    img = ram.read(DRA_BASE, dra_len)
+    n = len(img) // 4
+    words = struct.unpack("<%dI" % n, img[:4 * n])
+    out = [DRA_BASE + 4 * i for i, v in enumerate(words) if inside(v) and DRA_BASE + 4 * i not in slots]
+    out += [a for a in text_rt.code_refs(img) if inside(a)]
+    return out
+
+
+def build_rt(ram, syms, d, dub_packs):
+    """(the RT pack, the restore pack, info) from text_rt.py, or None without
+    the builder's retranslation files.
+    RT: every rewritten string laid out again in the string segments and the
+    overflow rooms, every slot repointed, the save messages in place, and
+    the PS1 / PSP packs' bytes it does not use put back to the built DRA's
+    (so it is a whole state over everything any pack writes).
+    restore: the built DRA's bytes and pointers over everything RT writes;
+    Default after RT = restore, then the dub's pack"""
+    import text_rt
+    res = text_rt.build(ram, syms)
+    if res is None:
+        return None
+    ents, saves, notes = res
+    dub = syms["g_ModDub"]
+    segs = rt_segments(ram, ents)
+    bad = foreign_refs(ram, syms, ents, segs, syms["dra_BSS_START"] - DRA_BASE)
+    assert not bad, "DRA refers into the strings the RT pack rewrites at %s" % [hex(a) for a in bad[:8]]
+    rooms = [list(x) for x in segs] + [
+        [dub + d["MOD_TEXT_OVF_%s_OFF" % r], dub + d["MOD_TEXT_OVF_%s_OFF" % r] + d["MOD_TEXT_OVF_%s_LEN" % r]]
+        for r in "ABC"]
+    # the strings, each once, longest first, first fit
+    texts = sorted({e.new + e.term() for e in ents}, key=lambda t: (-len(t), t))
+    fill = [a for a, _ in rooms]
+    at = {}
+    for t in texts:
+        for k, (a, b) in enumerate(rooms):
+            if fill[k] + len(t) <= b:
+                at[t] = fill[k]
+                fill[k] += len(t)
+                break
+        else:
+            sys.exit("text packs: the retranslation's strings (%d B) do not fit the %d B of DRA's "
+                     "strings + the overflow rooms" % (sum(map(len, texts)), sum(b - a for a, b in rooms)))
+    img = {}
+    for t, a in at.items():
+        for k, c in enumerate(t):
+            img[a + k] = c
+    recs = []
+    for k, (a, b) in enumerate(rooms):
+        if fill[k] > a:
+            recs.append(("copy", a, bytes(img[x] for x in range(a, fill[k]))))
+    # the save messages, in place
+    for addr, room, us, new, *_ in saves:
+        if new is not None:
+            recs.append(("copy", addr, new))
+    # the bytes the dub packs write that RT does not: their built values
+    rt_bytes = footprint(recs)[0]
+    dub_bytes = footprint(dub_packs[0])[0] | footprint(dub_packs[1])[0]
+    extra = sorted(dub_bytes - rt_bytes)
+    run = []
+    for x in extra + [None]:
+        if run and (x is None or x != run[-1] + 1):
+            a = run[0]
+            recs.append(("copy", a, ram.read(a, len(run)) if a < dub else bytes(len(run))))
+            run = []
+        if x is not None:
+            run.append(x)
+    # the pointers: per table and room base (offsets are 16 bits)
+    tables = {"equip": "g_EquipDefs", "acc": "g_AccessoryDefs", "relic": "g_RelicDefs",
+              "spell": "g_SpellDefs", "enemy": "g_EnemyDefs", "menu": "g_MenuStr", "help": "D_800A2D48"}
+    pool = min(a for a, _ in segs)
+    groups = {}
+    for e in ents:
+        tgt = at[e.new + e.term()]
+        base = pool if tgt < dub else dub
+        tb = syms[tables[e.table]]
+        groups.setdefault((tb, base), []).append(((e.slot - tb) // 4, tgt - base))
+    for (tb, base), items in sorted(groups.items()):
+        assert all(o < 0x10000 and w < 0x10000 for w, o in items)
+        recs.append(("ptr", tb, base, sorted(items)))
+    # restore: the built values of all of it
+    rb, rp = footprint(recs)
+    rest = []
+    run = []
+    for x in sorted(rb) + [None]:
+        if run and (x is None or x != run[-1] + 1):
+            a = run[0]
+            rest.append(("copy", a, ram.read(a, len(run)) if a < dub else bytes(len(run))))
+            run = []
+        if x is not None:
+            run.append(x)
+    groups = {}
+    for (tb, base), items in [((r[1], r[2]), r[3]) for r in recs if r[0] == "ptr"]:
+        for w, _ in items:
+            v = ram.u32(tb + 4 * w)
+            assert pool <= v < pool + 0x10000
+            groups.setdefault(tb, []).append((w, v - pool))
+    for tb, items in sorted(groups.items()):
+        rest.append(("ptr", tb, pool, sorted(set(items))))
+    info = {"ents": ents, "saves": saves, "notes": notes, "segs": segs, "rooms": rooms,
+            "fill": fill, "strings": len(texts), "string_bytes": sum(map(len, texts))}
+    return recs, rest, info
+
+
+def rt_layout(d, lba):
+    """(pad sectors before chunk 0, its CdFile_DemoKey g_LoadOvlIdx) for
+    the RT file at sector lba: chunk 0 starts at the first sector whose
+    distance to DEMOKEY is a multiple of 4"""
+    first = (d["MOD_TEXT_DEMOKEY_LBA"] - lba) & 3
+    idx = (lba + first - d["MOD_TEXT_DEMOKEY_LBA"]) // 4
+    assert lba + first == d["MOD_TEXT_DEMOKEY_LBA"] + 4 * idx
+    return first, idx
+
+
+def rt_file(chunks, first):
+    """SD/TXT_RT.BIN: first zero sectors, then each chunk in a whole 8 KB
+    read (a CdFile_DemoKey read is 4 sectors: the file is not cut short)"""
+    out = bytes(first * 0x800)
+    for c in chunks:
+        out += c + bytes(0x2000 - len(c))
+    return out
+
+
 def enc_record(r):
     if r[0] == "copy":
         _, dst, data = r
@@ -278,9 +436,12 @@ def split_record(r, room):
     return ("ptr", r[1], r[2], r[3][:n]), ("ptr", r[1], r[2], r[3][n:])
 
 
-def encode_chunks(packs, d):
+def encode_chunks(packs, d, room_of=None, where="SEL's dead config copy"):
     """the chunk stream: each pack's records in order, a chunk filled before
-    the next (a record cut where it does not fit)"""
+    the next (a record cut where it does not fit); room_of(c): the bytes
+    chunk c may use (SEL's dead copy by default)"""
+    if room_of is None:
+        room_of = lambda c: chunk_room(d, c)
     npk = d["MOD_TEXT_PACKS"]
     hdr = 0x10 + 2 * npk
     chunks = []  # per chunk: {pack: [encoded records]}
@@ -298,7 +459,7 @@ def encode_chunks(packs, d):
             c = len(chunks) - 1
             # its records here + their end marker
             start = 0 if p in chunks[c] else 4
-            room = chunk_room(d, c) - used[c] - start
+            room = room_of(c) - used[c] - start
             e = enc_record(r)
             if len(e) <= room:
                 chunks[c].setdefault(p, []).append(e)
@@ -312,8 +473,8 @@ def encode_chunks(packs, d):
             else:
                 todo.insert(0, r)
             new_chunk()
-            if chunk_room(d, len(chunks) - 1) < hdr + 16:
-                sys.exit("text packs: %d bytes do not fit SEL's dead config copy" % sum(used))
+            if room_of(len(chunks) - 1) < hdr + 16 or len(chunks) > 8:
+                sys.exit("text packs: %d bytes do not fit %s" % (sum(used), where))
     out = []
     for c, ch in enumerate(chunks):
         body, offs, mask = b"", [0] * npk, [0] * npk
@@ -329,7 +490,7 @@ def encode_chunks(packs, d):
         assert len(payload) % 2 == 0
         csum = sum(struct.unpack("<%dH" % (len(payload) // 2), payload)) & 0xFFFF
         blob = struct.pack("<IHH", d["MOD_TEXT_MAGIC"], size, csum) + payload
-        assert len(blob) == size <= chunk_room(d, c)
+        assert len(blob) == size <= room_of(c)
         out.append(blob)
     return out
 
@@ -380,15 +541,46 @@ def apply_pack(ram, chunks, pack, d):
     return 0x54585400 | pack
 
 
+def rt_lba():
+    """SD/TXT_RT.BIN's sector (include/lba_us.h; None before make disk has
+    put it there)"""
+    lba = open(os.path.join(ROOT, "include/lba_us.h")).read()
+    m = re.search(r"#define OFF_SD_TXT_RT (0x[0-9A-Fa-f]+)", lba)
+    return int(m[1], 16) if m else None
+
+
+def all_packs(ram, syms, d):
+    """{pack: records} for SEL's stream (PS1, PSP and, with the
+    retranslation, restore) and the RT file's ({RT} or {}), and the RT info"""
+    packs = build_packs(ram, syms, d)
+    rt = build_rt(ram, syms, d, packs)
+    if rt is None:
+        return packs, {}, None
+    recs, rest, info = rt
+    sel = dict(packs)
+    sel[PACK_RESTORE] = rest
+    return sel, {PACK_RT: recs}, info
+
+
+def write_if_changed(path, data):
+    if os.path.exists(path) and open(path, "rb").read() == data:
+        return False
+    open(path, "wb").write(data)
+    return True
+
+
 def make(write=False):
     d = c_defines()
     syms = dra_symbols()
     dra = dra_image(os.path.join(BUILD, "DRA.BIN"), syms)
     ram = Ram(dra, syms["g_ModDub"])
-    packs = build_packs(ram, syms, d)
+    packs, rt_packs, rt_info = all_packs(ram, syms, d)
     chunks = encode_chunks(packs, d)
+    rt_chunks = encode_chunks(rt_packs, d, lambda c: d["MOD_TEXT_CHUNK_LEN"], "8 chunks") if rt_packs else []
+    lba = rt_lba()
+    first, rt_idx = rt_layout(d, lba) if lba else (0, None)
     edits = []
-    changed = False
+    changed = []
     sel_path = os.path.join(BUILD, "SEL.BIN")
     if write:
         sel = bytearray(open(sel_path, "rb").read())
@@ -397,27 +589,61 @@ def make(write=False):
             assert DEAD_START <= off and off + len(blob) <= DEAD_END
             if sel[off:off + len(blob)] != blob:
                 sel[off:off + len(blob)] = blob
-                changed = True
+                changed[:0] = [] if "SEL.BIN" in changed else ["SEL.BIN"]
             edits.append([off, len(blob)])
         if changed:
             open(sel_path, "wb").write(sel)
+        # without the retranslation: one empty sector (the file is on the
+        # disc either way; nothing reads it)
+        if write_if_changed(RT_FILE, rt_file(rt_chunks, first) if rt_chunks else bytes(0x800)):
+            changed.append("TXT_RT.BIN")
     info = {
         "sector": d["SECTOR"], "cd_idx": d["CD_IDX"], "sel_off": d["ST_SEL_BIN_OFF"],
         "sel_edits": edits or [[(d["SECTOR"] + 4 * c) * 0x800, len(b)] for c, b in enumerate(chunks)],
         "chunks": [b.hex() for b in chunks],
+        "rt_lba": lba, "rt_first": first, "rt_cd_idx": rt_idx, "rt_chunks": [b.hex() for b in rt_chunks],
     }
     json.dump(info, open(OUT_JSON, "w"), indent=1)
-    return d, packs, chunks, changed
+    return d, packs, chunks, rt_packs, rt_chunks, rt_info, changed
+
+
+def write_header():
+    """mods/sotn-ultimate/include/mod_text_rt.h (gitignored, made before
+    the compile): MOD_TEXT_RT_ON, 1 when the builder has the retranslation's
+    files (checked by text_rt.py)"""
+    import text_rt
+    ok, msg = text_rt.inputs_state()
+    text = ("// Generated by mods/sotn-ultimate/tools/text_packs.py --header, do not edit\n"
+            "// %s\n#define MOD_TEXT_RT_ON %d\n" % (msg, 1 if ok else 0))
+    changed = write_if_changed(RT_HEADER, text.encode())
+    print("text packs: %s%s" % (msg, " (mod_text_rt.h)" if changed else ""))
 
 
 def main():
+    if "--header" in sys.argv[1:]:
+        write_header()
+        return
     write = "--apply" in sys.argv[1:]
-    d, packs, chunks, changed = make(write)
+    d, packs, chunks, rt_packs, rt_chunks, rt_info, changed = make(write)
     per = {p: sum(len(enc_record(r)) for r in packs[p]) for p in packs}
+    per.update({p: sum(len(enc_record(r)) for r in rt_packs[p]) for p in rt_packs})
     print("text packs: %s; %d chunk(s) %s at SEL sector %d (file 0x%X, g_LoadOvlIdx %d)%s" % (
         ", ".join("%s %d B" % (PACK_NAMES[p], per[p]) for p in sorted(per)),
         len(chunks), "+".join(str(len(c)) for c in chunks), d["SECTOR"], d["SECTOR"] * 0x800,
-        d["CD_IDX"], (" (SEL.BIN)" if changed else " (already)") if write else ""))
+        d["CD_IDX"], (" (%s)" % ", ".join(changed) if changed else " (already)") if write else ""))
+    used = sum(len(c) for c in chunks)
+    print("text packs: SEL dead copy %d of %d B used" % (used, sum(chunk_room(d, c) for c in range(8))))
+    if rt_info:
+        print("text packs: retranslation %d strings %d B in DRA's strings + rooms (%d of %d B used); "
+              "%d chunk(s) %s in SD/TXT_RT.BIN at sector %s + %d (g_LoadOvlIdx %s)" % (
+                  rt_info["strings"], rt_info["string_bytes"],
+                  sum(f - a for f, (a, _) in zip(rt_info["fill"], rt_info["rooms"])),
+                  sum(b - a for a, b in rt_info["rooms"]), len(rt_chunks),
+                  "+".join(str(len(c)) for c in rt_chunks), rt_lba(), rt_layout(d, rt_lba())[0] if rt_lba() else 0,
+                  rt_layout(d, rt_lba())[1] if rt_lba() else "?"))
+    else:
+        import text_rt
+        print("text packs: no retranslation pack (%s)" % text_rt.inputs_state()[1])
 
 
 if __name__ == "__main__":

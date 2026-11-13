@@ -104,8 +104,10 @@ def main():
     syms = nm(os.path.join(BUILD, "dra.elf"))
     dra = tp.dra_image(os.path.join(BUILD, "DRA.BIN"), syms)
     dub = syms["g_ModDub"]
-    packs = tp.build_packs(tp.Ram(dra, dub), syms, d)
-    chunks = tp.encode_chunks(packs, d)
+    sel_packs, rt_packs, rt_info = tp.all_packs(tp.Ram(dra, dub), syms, d)
+    packs = {p: sel_packs[p] for p in (0, 1)}
+    chunks = tp.encode_chunks(sel_packs, d)
+    rt_chunks = tp.encode_chunks(rt_packs, d, lambda c: d["MOD_TEXT_CHUNK_LEN"], "8 chunks") if rt_packs else []
 
     # 1. SEL's copy, where its code reads it
     sel_syms = nm(os.path.join(BUILD, "stsel.elf"))
@@ -179,6 +181,8 @@ def main():
             elif not tp.chunk_ok(got, d) or got[8] != c:
                 fail("chunk %d on the disc fails the applier's own check" % c)
 
+    rt_disc_check(d, syms, dra, sel_syms, rt_chunks, img_path)
+
     # 3. the proof, on this build's DRA
     n_bytes = n_ptrs = 0
     for psp in (0, 1):
@@ -206,12 +210,217 @@ def main():
     # 4. a retranslation-sized synthetic pack
     synth_test(d, syms, dra, dub)
 
+    # 5. the retranslation: round trips, pointers, write bounds
+    if rt_packs:
+        rt_proof(d, syms, dra, dub, chunks, rt_chunks, sel_packs, rt_packs, rt_info)
+
     if bad:
         sys.exit(1)
+    print("OK   text packs: SEL dead copy %d of %d B used; %s" % (
+        sum(map(len, chunks)), sum(tp.chunk_room(d, c) for c in range(8)),
+        "retranslation pack %d chunk(s) (%s B) in SD/TXT_RT.BIN" % (len(rt_chunks), "+".join(str(len(c)) for c in rt_chunks))
+        if rt_chunks else "no retranslation pack (no disks/jpre): Script = Retrans shows the dub's text"))
     print("OK   text packs: %d chunk(s) (%s B) in SEL sector %d and on the disc (g_LoadOvlIdx %d); "
           "PS1 / PSP packs = step 3's mechanism byte for byte (footprint %d bytes, %d pointers)"
           % (len(chunks), "+".join(str(len(c)) for c in chunks), d["SECTOR"], d["CD_IDX"],
              len(fp[0]), n_ptrs))
+
+
+def rt_disc_check(d, syms, dra, sel_syms, rt_chunks, img_path):
+    """the switch, the words SEL / sysopt load with and SD/TXT_RT.BIN on
+    the disc"""
+    hdr = open(tp.RT_HEADER).read()
+    on = int(re.search(r"#define MOD_TEXT_RT_ON (\d)", hdr)[1])
+    if on != (1 if rt_chunks else 0):
+        fail("mod_text_rt.h says MOD_TEXT_RT_ON %d, the build made %d RT chunk(s)" % (on, len(rt_chunks)))
+    lba = tp.rt_lba()
+    if lba is None:
+        fail("include/lba_us.h has no OFF_SD_TXT_RT")
+        return
+    first, idx = tp.rt_layout(d, lba)
+    want = tp.rt_file(rt_chunks, first) if rt_chunks else bytes(0x800)
+    if open(tp.RT_FILE, "rb").read() != want:
+        fail("build/us/TXT_RT.BIN is not this build's (run text_packs.py --apply)")
+    if not rt_chunks:
+        return
+    sys_syms = nm(os.path.join(BUILD, "mod/sysopt/sysopt.elf"))
+    arc = open(os.path.join(BUILD, "ARC_F2.BIN"), "rb").read()
+    for who, syms_, data, base in (("sysopt", sys_syms, arc, 0x8013C000),
+                                   ("SEL", sel_syms, open(os.path.join(BUILD, "SEL.BIN"), "rb").read(), tp.SEL_BASE)):
+        if "g_ModTextRtCdIdx" not in syms_:
+            fail("%s has no g_ModTextRtCdIdx" % who)
+            continue
+        got = struct.unpack_from("<i", data, syms_["g_ModTextRtCdIdx"] - base)[0]
+        if got != idx:
+            fail("%s loads the RT chunks with g_LoadOvlIdx %d, they need %d" % (who, got, idx))
+    if not os.path.exists(img_path):
+        return
+    img = open(img_path, "rb")
+    for c, blob in enumerate(rt_chunks):
+        sec = d["MOD_TEXT_DEMOKEY_LBA"] + 4 * (idx + c)
+        img.seek(sec * 2352)
+        raw = img.read(4 * 2352)
+        if len(raw) < 4 * 2352:
+            fail("RT chunk %d: the disc ends inside its 4-sector read" % c)
+            continue
+        got = sector_data(raw, 0, 4)
+        if got[:len(blob)] != blob:
+            fail("the disc's sector 0x%X (g_LoadOvlIdx %d) is not RT chunk %d" % (sec, idx + c, c))
+        elif not tp.chunk_ok(got, d) or got[8] != c:
+            fail("RT chunk %d on the disc fails the applier's own check" % c)
+    print("OK   text packs: RT chunks at SD/TXT_RT.BIN sector %d + %d = DEMOKEY + 4 * %d, read by SEL "
+          "and sysopt with that g_LoadOvlIdx" % (lba, first, idx))
+
+
+# --- the drivers, as the C runs them (text_pack.h, SEL, sysopt) ----------
+def run_pack(ram, chunks, pack, d, upto=None):
+    """every chunk of the stream, pack's records (upto: stop after that many
+    chunks, a half-applied pack); 1 when all applied"""
+    for i, c in enumerate(chunks):
+        if upto is not None and i >= upto:
+            return 0
+        if not tp.chunk_ok(c, d) or c[8] != i:
+            return 0
+        tp.apply_chunk(ram, c, pack)
+        if i + 1 >= c[9]:
+            return 1
+    return 0
+
+
+class Game:
+    """DRA's RAM + g_ModDub.textPack, driven like SEL / the System popup"""
+
+    def __init__(self, dra, dub, sel, rt, d):
+        self.ram, self.tag, self.sel, self.rt, self.d = tp.Ram(dra, dub), 0, sel, rt, d
+
+    def default(self, pack):
+        """ModTextSelDub / SysOptText to a dub's pack"""
+        if self.tag != 0x54585400 | pack:
+            if self.tag not in (0x54585400, 0x54585401):
+                run_pack(self.ram, self.sel, tp.PACK_RESTORE, self.d)
+            run_pack(self.ram, self.sel, pack, self.d)
+            self.tag = 0x54585400 | pack
+
+    def retrans(self, upto=None):
+        if self.tag != 0x54585402:
+            self.tag = 0
+            if run_pack(self.ram, self.rt, tp.PACK_RT, self.d, upto):
+                self.tag = 0x54585402
+
+    def half_default(self, pack, upto):
+        """a restore pass cut after upto chunks (the menu left mid-load)"""
+        self.tag = 0
+        run_pack(self.ram, self.sel, tp.PACK_RESTORE, self.d, upto)
+
+    def state(self):
+        return bytes(self.ram.regions[0][1]) + bytes(self.ram.regions[1][1])
+
+
+def rt_proof(d, syms, dra, dub, chunks, rt_chunks, sel_packs, rt_packs, info, quiet=False):
+    """(b) round trips restore RAM exactly, (c) RT pointers land in strings
+    RT writes, (d) no write outside DRA's rewritten strings, the overflow
+    rooms and the save message literals, no pointer outside the slots"""
+    errs = []
+    dubs = [("PS1", 0), ("PSP", 1), ("JP", 1)]
+    ref = {}
+    for name, pk in dubs:
+        g = Game(dra, dub, chunks, rt_chunks, d)
+        legacy_apply(g.ram, syms, dub, pk)
+        ref[pk] = g.state()
+    g = Game(dra, dub, chunks, rt_chunks, d)
+    g.default(0)
+    if g.state() != ref[0]:
+        errs.append("restore + PS1 from boot differs from step 3's PS1")
+    g.retrans()
+    rt_state = g.state()
+    steps = 0
+    for name, pk in dubs:
+        for other, pk2 in dubs:
+            g = Game(dra, dub, chunks, rt_chunks, d)
+            g.default(pk)
+            g.retrans()
+            steps += 1
+            if g.state() != rt_state:
+                errs.append("RT after %s differs from RT after PS1" % name)
+            g.default(pk2)
+            if g.state() != ref[pk2]:
+                errs.append("%s -> Retrans -> Default (%s) does not restore RAM" % (name, other))
+            g.retrans()
+            g.default(pk)
+            if g.state() != ref[pk]:
+                errs.append("%s -> RT -> %s -> RT -> %s does not restore RAM" % (name, other, name))
+            # cut loads: RT half applied, then Default; a cut restore, then RT / Default
+            for k in range(1, len(rt_chunks)):
+                h = Game(dra, dub, chunks, rt_chunks, d)
+                h.default(pk)
+                h.retrans(upto=k)
+                h.default(pk2)
+                if h.state() != ref[pk2]:
+                    errs.append("%s -> RT cut after %d chunk(s) -> %s does not restore RAM" % (name, k, other))
+            for k in range(1, len(chunks)):
+                h = Game(dra, dub, chunks, rt_chunks, d)
+                h.retrans()
+                h.half_default(pk2, k)
+                h.retrans()
+                if h.state() != rt_state:
+                    errs.append("RT -> restore cut after %d chunk(s) -> RT differs" % k)
+                h.half_default(pk2, k)
+                h.default(pk2)
+                if h.state() != ref[pk2]:
+                    errs.append("RT -> restore cut after %d -> %s does not restore RAM" % (k, other))
+    # (c) every pointer RT writes: the whole string it points to is RT's
+    kinds = {e.slot: e.kind for e in info["ents"]}
+    g = Game(dra, dub, chunks, rt_chunks, d)
+    g.retrans()
+    rt_bytes, rt_ptrs = tp.footprint(rt_packs[tp.PACK_RT])
+    nptr = 0
+    for slot in sorted(rt_ptrs):
+        t = g.ram.u32(slot)
+        s_ = g.ram.cstr(t, kinds[slot])
+        nptr += 1
+        if not set(range(t, t + len(s_))) <= rt_bytes:
+            errs.append("RT pointer at 0x%X -> 0x%X: its string is not all RT's" % (slot, t))
+    # (d) the bounds
+    rooms = set()
+    for a, b in info["rooms"]:
+        rooms |= set(range(a, b))
+    for addr, room, *_ in info["saves"]:
+        rooms |= set(range(addr, addr + room))
+    slots = set(kinds)
+    for p, recs in list(sel_packs.items()) + list(rt_packs.items()):
+        b_, p_ = tp.footprint(recs)
+        if not b_ <= rooms:
+            x = sorted(b_ - rooms)
+            errs.append("pack %s writes outside the strings / rooms at 0x%X (+%d)" % (tp.PACK_NAMES[p], x[0], len(x)))
+        if not p_ <= slots:
+            errs.append("pack %s writes pointers outside the string slots: %s" % (tp.PACK_NAMES[p], [hex(x) for x in sorted(p_ - slots)[:4]]))
+    # the strings rewritten: nothing else in DRA refers into them
+    bad_refs = tp.foreign_refs(tp.Ram(dra, dub), syms, info["ents"], info["segs"], len(dra))
+    if bad_refs:
+        errs.append("DRA words point into the rewritten strings at %s" % [hex(a) for a in bad_refs[:4]])
+    if quiet:
+        return errs
+    for e in errs:
+        fail(e)
+    if not errs:
+        print("OK   text packs: retranslation round trips: %d dub pairs x (Default -> RT -> Default, "
+              "RT -> Default -> RT, loads cut after each chunk) restore DRA + g_ModDub byte for byte; "
+              "RT the same from every dub; %d RT pointers land in RT's own strings; every write in "
+              "DRA's rewritten strings (%d B), the overflow rooms or %d save message literals, every "
+              "pointer in the %d string slots" % (steps, nptr, sum(b - a for a, b in info["segs"]),
+                                                   len(info["saves"]), len(slots)))
+        # the check catches a restore pack missing one pointer (one the
+        # dub packs do not write)
+        rest = list(sel_packs[tp.PACK_RESTORE])
+        dubp = tp.footprint(sel_packs[0])[1]
+        k = next(i for i, r in enumerate(rest) if r[0] == "ptr" and r[1] + 4 * r[3][0][0] not in dubp)
+        rest[k] = ("ptr", rest[k][1], rest[k][2], rest[k][3][1:])
+        mut = dict(sel_packs)
+        mut[tp.PACK_RESTORE] = rest
+        if not rt_proof(d, syms, dra, dub, tp.encode_chunks(mut, d), rt_chunks, mut, rt_packs, info, quiet=True):
+            fail("the round-trip proof does not catch a restore pack missing one pointer")
+        else:
+            print("OK   text packs: mutation (a restore pack missing one pointer) is caught")
 
 
 def string_slots(syms, ram):

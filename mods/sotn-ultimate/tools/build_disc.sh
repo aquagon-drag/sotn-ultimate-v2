@@ -45,6 +45,14 @@ rm -f build/us/cc1_errors.log
 # this build used stale sectors, so it starts again once (below make disk)
 LBA_BEFORE=$(sha1sum include/lba_us.h 2>/dev/null || true)
 
+# Script = Retrans: the fan retranslation's text pack is made only from the
+# builder's own copy of the patched Japanese disc (disks/jpre, checked by
+# hash; mods/sotn-ultimate/tools/text_rt.py). Its switch for SEL and the System popup
+# (mods/sotn-ultimate/include/mod_text_rt.h), and SD/TXT_RT.BIN's
+# placeholder for make disk (text_packs.py --apply writes the pack there)
+(cd mods/sotn-ultimate/tools && python3 text_packs.py --header)
+mkdir -p build/us
+[ -f build/us/TXT_RT.BIN ] || head -c 2048 /dev/zero > build/us/TXT_RT.BIN
 python3 mods/sotn-ultimate/tools/gen_mod_layouts.py
 # the staff roll of Ending = PSP (SEL's dead config copy, config_us.c)
 python3 mods/sotn-ultimate/tools/gen_credits_psp.py
@@ -312,7 +320,7 @@ if [ "$MOD_PSP_DUB" = 1 ]; then
 fi
 out=$(cd mods/sotn-ultimate/tools && python3 text_packs.py --apply)
 echo "$out"
-if echo "$out" | grep -q "(SEL.BIN)"; then
+if echo "$out" | grep -qE "\((SEL|TXT_RT)\.BIN"; then
     remake=1
 fi
 if [ -n "$remake" ]; then
