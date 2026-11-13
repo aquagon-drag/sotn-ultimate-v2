@@ -211,6 +211,7 @@ def main():
     synth_test(d, syms, dra, dub)
 
     # 5. the retranslation: round trips, pointers, write bounds
+    rt_hook_check(d, syms, dra)
     if rt_packs:
         rt_proof(d, syms, dra, dub, chunks, rt_chunks, sel_packs, rt_packs, rt_info)
 
@@ -273,6 +274,31 @@ def rt_disc_check(d, syms, dra, sel_syms, rt_chunks, img_path):
 
 
 # --- the drivers, as the C runs them (text_pack.h, SEL, sysopt) ----------
+def rt_hook_check(d, syms, dra):
+    """DRA's func_800F99B8 calls the RT font's code (jal MOD_RT_FONT_ADDR)
+    only after reading the low byte of g_ModDub.textPack (lui + lbu); the
+    font's code was linked against this DRA's line pointer"""
+    f = syms["func_800F99B8"] - tp.DRA_BASE
+    words = struct.unpack_from("<%dI" % 0x100, dra, f)
+    a = d["MOD_RT_FONT_ADDR"]
+    jal = 0x0C000000 | ((a >> 2) & 0x3FFFFFF)
+    tag = syms["g_ModDub"] + 1224  # OFF(ModDubState, textPack), text_pack.h
+    lo = tag & 0xFFFF
+    hi = (tag + 0x8000) >> 16
+    k = [i for i, w in enumerate(words) if w == jal]
+    ok = len(k) == 1 and any(
+        words[i] >> 26 == 0xF and words[i] & 0xFFFF == hi and words[i + 1] >> 26 == 0x24 and
+        words[i + 1] & 0xFFFF == lo for i in range(max(0, k[0] - 6), k[0]))
+    if not ok:
+        fail("DRA's func_800F99B8 does not call the RT font (jal 0x%X after lbu textPack)" % a)
+    rs = nm(os.path.join(tp.RTFONT, "rtfont.elf"))
+    if rs.get("ModRtText") != a or rs.get("D_8013794C") != syms["D_8013794C"]:
+        fail("rtfont.elf is not linked at 0x%X against this DRA (build_rtfont.sh)" % a)
+    else:
+        print("OK   text packs: DRA calls the RT font at 0x%X when the RT pack's tag is set; "
+              "its code is linked against this DRA" % a)
+
+
 def run_pack(ram, chunks, pack, d, upto=None):
     """every chunk of the stream, pack's records (upto: stop after that many
     chunks, a half-applied pack); 1 when all applied"""
@@ -387,8 +413,19 @@ def rt_proof(d, syms, dra, dub, chunks, rt_chunks, sel_packs, rt_packs, info, qu
     for addr, room, *_ in info["saves"]:
         rooms |= set(range(addr, addr + room))
     slots = set(kinds)
+    # the font's room: the RT pack only, and the whole blob lands there
+    fa, fb = info["font"]
+    font = set(range(fa, fa + len(fb)))
+    if not (tp.RT_FONT_ADDR <= fa and fa + len(fb) <= tp.RT_FONT_END):
+        errs.append("the RT font blob 0x%X+%d is outside its room" % (fa, len(fb)))
+    if g.ram.read(fa, len(fb)) != fb:
+        errs.append("the RT pack does not leave the font's code and glyphs in their room")
     for p, recs in list(sel_packs.items()) + list(rt_packs.items()):
         b_, p_ = tp.footprint(recs)
+        if p == tp.PACK_RT:
+            b_ = b_ - font
+        elif b_ & font:
+            errs.append("pack %s writes the RT font's room" % tp.PACK_NAMES[p])
         if not b_ <= rooms:
             x = sorted(b_ - rooms)
             errs.append("pack %s writes outside the strings / rooms at 0x%X (+%d)" % (tp.PACK_NAMES[p], x[0], len(x)))
@@ -407,8 +444,9 @@ def rt_proof(d, syms, dra, dub, chunks, rt_chunks, sel_packs, rt_packs, info, qu
               "RT -> Default -> RT, loads cut after each chunk) restore DRA + g_ModDub byte for byte; "
               "RT the same from every dub; %d RT pointers land in RT's own strings; every write in "
               "DRA's rewritten strings (%d B), the overflow rooms or %d save message literals, every "
-              "pointer in the %d string slots" % (steps, nptr, sum(b - a for a, b in info["segs"]),
-                                                   len(info["saves"]), len(slots)))
+              "pointer in the %d string slots; the RT font (%d B) whole in its room, written by the "
+              "RT pack only" % (steps, nptr, sum(b - a for a, b in info["segs"]),
+                                len(info["saves"]), len(slots), len(info["font"][1])))
         # the check catches a restore pack missing one pointer (one the
         # dub packs do not write)
         rest = list(sel_packs[tp.PACK_RESTORE])

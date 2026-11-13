@@ -128,7 +128,7 @@ def c_defines():
     """the MOD_TEXT_* numbers of include/game_mod.h and the SEL sector of
     include/lba_us.h, as the C code computes them"""
     src = open(os.path.join(ROOT, "mods/sotn-ultimate/include/game_mod.h"), encoding="utf-8").read()
-    d = {k: int(v, 0) for k, v in re.findall(r"#define (MOD_TEXT_\w+|MOD_DUB_STATE_ADDR) +(0x[0-9A-Fa-f]+|\d+)\b", src)}
+    d = {k: int(v, 0) for k, v in re.findall(r"#define (MOD_TEXT_\w+|MOD_RT_\w+|MOD_DUB_STATE_ADDR) +(0x[0-9A-Fa-f]+|\d+)\b", src)}
     lba = open(os.path.join(ROOT, "include/lba_us.h")).read()
     d["ST_SEL_BIN_OFF"] = int(re.search(r"#define ST_SEL_BIN_OFF (0x[0-9A-Fa-f]+)", lba)[1], 16)
     first = d["MOD_TEXT_BLOB_FIRST"]
@@ -159,10 +159,18 @@ def dra_image(path, syms):
     return open(path, "rb").read()[:syms["dra_BSS_START"] - DRA_BASE]
 
 
+# the retranslation font's room (include/game_mod.h MOD_RT_FONT_ADDR / END:
+# DRA's BSS end to the player file); only the RT pack writes it, and only
+# Script = Retrans reads it (so the round trips leave it out: Ram.regions[2])
+RT_FONT_ADDR, RT_FONT_END = 0x8013B6A0, 0x8013C000
+RTFONT = os.path.join(BUILD, "mod/rtfont")
+
+
 class Ram:
     def __init__(self, dra, dub_addr, dub=None):
-        assert DRA_BASE + len(dra) <= dub_addr
-        self.regions = [(DRA_BASE, bytearray(dra)), (dub_addr, bytearray(dub or bytes(4096)))]
+        assert DRA_BASE + len(dra) <= dub_addr and dub_addr + 4096 <= RT_FONT_ADDR
+        self.regions = [(DRA_BASE, bytearray(dra)), (dub_addr, bytearray(dub or bytes(4096))),
+                        (RT_FONT_ADDR, bytearray(RT_FONT_END - RT_FONT_ADDR))]
 
     def _at(self, addr, n):
         for base, buf in self.regions:
@@ -389,9 +397,37 @@ def build_rt(ram, syms, d, dub_packs):
             groups.setdefault(tb, []).append((w, v - pool))
     for tb, items in sorted(groups.items()):
         rest.append(("ptr", tb, pool, sorted(set(items))))
+    # the retranslation's font for DRA's BIOS-font text: its code, widths and
+    # glyphs into their room (after the restore pack's list: Default never
+    # reads them, nothing puts them back)
+    font = rt_font_blob(d)
+    recs.append(("copy", d["MOD_RT_FONT_ADDR"], font))
     info = {"ents": ents, "saves": saves, "notes": notes, "segs": segs, "rooms": rooms,
-            "fill": fill, "strings": len(texts), "string_bytes": sum(map(len, texts))}
+            "fill": fill, "strings": len(texts), "string_bytes": sum(map(len, texts)),
+            "font": (d["MOD_RT_FONT_ADDR"], font)}
     return recs, rest, info
+
+
+def rt_font_blob(d):
+    """mods/sotn-ultimate/src/menu/rt_font.c as built by build_rtfont.sh,
+    then the patch's width table and glyphs where it reads them
+    (g_ModRtW / g_ModRtGlyph): the bytes from MOD_RT_FONT_ADDR"""
+    import text_rt
+    a = d["MOD_RT_FONT_ADDR"]
+    assert (a, d["MOD_RT_FONT_END"]) == (RT_FONT_ADDR, RT_FONT_END)
+    assert d["MOD_RT_GLYPHS"] == text_rt.RT_GLYPHS
+    code_path = os.path.join(RTFONT, "rtfont.bin")
+    if not os.path.exists(code_path):
+        sys.exit("text packs: no %s (run mods/sotn-ultimate/tools/build_rtfont.sh)" % code_path)
+    code = open(code_path, "rb").read()
+    syms = dra_symbols(os.path.join(RTFONT, "rtfont.elf"))
+    assert syms["ModRtText"] == a, "rtfont: ModRtText is not at MOD_RT_FONT_ADDR"
+    widths, glyphs = text_rt.rt_font()
+    w, g = syms["g_ModRtW"], syms["g_ModRtGlyph"]
+    assert a + len(code) <= w and g == w + len(widths) and syms["g_ModRtEnd"] == g + len(glyphs)
+    blob = code + bytes(w - a - len(code)) + widths + glyphs
+    assert a + len(blob) <= d["MOD_RT_FONT_END"]
+    return blob + bytes(-len(blob) % 4)
 
 
 def rt_layout(d, lba):

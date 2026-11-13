@@ -291,6 +291,10 @@ bash mods/sotn-ultimate/tools/build_cenp.sh
 # after Alucard's sprites in build/us/ARC_F2.BIN (mods/sotn-ultimate/src/menu/sysopt.c),
 # against DRA's addresses (checked again after make disk below)
 bash mods/sotn-ultimate/tools/build_sysopt.sh
+# Script = Retrans: the retranslation font's code for DRA's BIOS-font text
+# (mods/sotn-ultimate/src/menu/rt_font.c), carried by the RT pack with the
+# font from disks/jpre (text_packs.py); against DRA's addresses
+bash mods/sotn-ultimate/tools/build_rtfont.sh
 # Richter in the coat in the endings: build/us/SELRIC2.BIN (SEL.BIN + the
 # RIC2 art); made again below from the final SEL
 (cd mods/sotn-ultimate/tools && python3 build_selric2.py)
@@ -367,6 +371,16 @@ while read -r s _ a; do
     fi
 done < build/us/mod/sysopt/syms.txt
 echo "OK   sysopt DRA symbols ($(wc -l < build/us/mod/sysopt/syms.txt)), ARC_F2.BIN $(stat -c %s build/us/ARC_F2.BIN) bytes"
+# and for the retranslation font's code (in SD/TXT_RT.BIN)
+while read -r s _ a; do
+    a=${a%;}
+    want=$(mipsel-linux-gnu-nm build/us/dra.elf | awk -v s="$s" '$3==s{print "0x" $1}')
+    if [ "$want" != "$a" ]; then
+        echo "FAIL rtfont linked against $s $a (DRA has $want): run build_disc.sh again"
+        exit 1
+    fi
+done < build/us/mod/rtfont/syms.txt
+echo "OK   rtfont DRA symbols ($(wc -l < build/us/mod/rtfont/syms.txt))"
 bash mods/sotn-ultimate/tools/check_no_dirt.sh
 python3 mods/sotn-ultimate/tools/check_stage_data.py
 python3 mods/sotn-ultimate/tools/check_credits_roll.py --build

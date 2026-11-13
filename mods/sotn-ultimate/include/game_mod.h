@@ -396,6 +396,18 @@ typedef struct {
 // DRA's dead VSync-effect buffers (4 KB, src/dra/47BB8.c), at a fixed address
 // (SEL, sysopt and save_mgr.h use it; check_psp_dub.py checks it)
 #define MOD_DUB_STATE ((ModDubState*)0x8013644C)
+// Script = Retrans: the retranslation's 12 px proportional font for the text
+// DRA draws with the BIOS font (src/dra/menu.c func_800F99B8: descriptions,
+// help lines, relic and spell names, save messages). Its code
+// (mods/sotn-ultimate/src/menu/rt_font.c, ModRtText first), width table and
+// glyphs are written by the RT pack into the RAM between DRA's BSS end and
+// the player file (DRA.BIN's boot-time sound bank, dead after boot), so they
+// are there exactly when g_ModDub.textPack is MOD_TEXT_TAG(MOD_TEXT_PACK_RT):
+// func_800F99B8 checks that, then calls MOD_RT_FONT_ADDR
+// (mods/sotn-ultimate/tools/build_rtfont.sh checks the addresses)
+#define MOD_RT_FONT_ADDR 0x8013B6A0
+#define MOD_RT_FONT_END 0x8013C000
+#define MOD_RT_GLYPHS 112
 typedef struct {
     u32 cfg[4]; // ModXaConfig's redirected XaMusicConfig
     ModJpDubTable jp;

@@ -2380,6 +2380,11 @@ void func_800F98AC(const char* str, u32 y) {
     }
 }
 
+#if defined(VERSION_US) && defined(MOD_RT_FONT_ADDR)
+// (config/undefined_syms.us.txt: MOD_RT_FONT_ADDR; rt_font.c, which draws
+// into D_8013794C's line, w bytes a row)
+s32 ModRtText(const char* str, s32 w);
+#endif
 #if defined(VERSION_US) || defined(VERSION_PSP)
 void func_800F99B8(const char* str, u32 y, bool arg2) {
     // See src/st/blit_char.h
@@ -2420,6 +2425,16 @@ void func_800F99B8(const char* str, u32 y, bool arg2) {
 #ifdef VERSION_PC
     NOT_IMPLEMENTED;
     return;
+#endif
+#if defined(VERSION_US) && defined(MOD_RT_FONT_ADDR)
+    // Script = Retrans: the retranslation's own font, while its pack (which
+    // brings the font's code and glyphs, include/game_mod.h) is applied
+    // (the tag's low byte: MOD_TEXT_TAG(pack) is all that is written
+    // there); a string with a character it lacks stays with the BIOS font
+    if (*(u8*)&MOD_DUB_STATE->textPack == MOD_TEXT_PACK_RT &&
+        ModRtText(str, var_s4)) {
+        goto upload;
+    }
 #endif
     while (*str != 0) {
         var_s2 = 0;
@@ -2502,6 +2517,9 @@ void func_800F99B8(const char* str, u32 y, bool arg2) {
         }
     }
 
+#if defined(VERSION_US) && defined(MOD_RT_FONT_ADDR)
+upload:
+#endif
     LoadTPage((u_long*)D_8013794C, 0, 0, D_80137950 + x, D_80137954 + y,
               var_s4 * 2, 0x10);
     D_8013794C += var_s4 * FontHeight;

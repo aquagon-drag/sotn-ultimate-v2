@@ -35,7 +35,10 @@ Encodings out (the US engine's, unchanged): names, enemy names and menu
 words in the 8x8 font (_S: each character - 0x20, end 0xFF 0); relic and
 spell names, descriptions, help lines and the save messages through the
 BIOS-font renderer (func_800F99B8: ASCII letters and space, everything else
-as Shift-JIS pairs).
+as Shift-JIS pairs). With the RT pack applied, that renderer draws them with
+the patch's own 12 px font instead (mods/sotn-ultimate/src/menu/rt_font.c;
+its glyphs and widths: rt_font() below, from the same DRA.BIN), so their
+fit is measured with it (rt_draw).
 
 Usage:
   text_rt.py              print a summary (or "no inputs")
@@ -199,6 +202,114 @@ def bios_width(b):
             w += BIOS_W_SJIS[p]
             i += 4 if p == b"\x81\x68" else 2
     return w
+
+
+# --- the retranslation's 12 px font (Script = Retrans) ----------------------
+# DRA's func_800F99B8 hands its strings to mods/sotn-ultimate/src/menu/
+# rt_font.c ModRtText while the RT pack is applied; that pack carries the
+# code and the patch's font, read here from the builder's DRA.BIN. This is a
+# pixel-exact model of ModRtText (the fit limits and the preview use it).
+JP_FONT = 0x40710  # 8x12, 1 bit per pixel (bit 7 = left), 12 bytes a glyph
+JP_FONT_W = 0x40DC0  # the advance of each glyph, pixels
+RT_GLYPHS = 112
+RT_SRC = os.path.join(ROOT, "mods/sotn-ultimate/src/menu/rt_font.c")
+RT_ROW0, RT_BODY, RT_SHADOW = 2, 7, 1  # as rt_font.c
+
+
+def rt_font():
+    """(widths, glyphs): the patch's width table and glyph bytes"""
+    d = open(JP_DRA, "rb").read()
+    return d[JP_FONT_W:JP_FONT_W + RT_GLYPHS], d[JP_FONT:JP_FONT + 12 * RT_GLYPHS]
+
+
+def rt_sjis81():
+    """rt_font.c's g_ModRtSjis81: {Shift-JIS 0x81xx: glyph}"""
+    src = open(RT_SRC, encoding="utf-8").read()
+    body = re.search(r"g_ModRtSjis81\[\]\[2\] = \{(.*?)\};", src, re.S)[1]
+    return {0x8100 + int(a, 16): int(g) for a, g in re.findall(r"\{(0x[0-9A-Fa-f]+), (\d+)\}", body)}
+
+
+RT_SJIS81 = rt_sjis81()
+
+
+def rt_glyphs(b):
+    """ModRtNext over b (no terminator): the glyph indices, or None when the
+    font lacks a character (the BIOS font draws that string)"""
+    out, i = [], 0
+    while i < len(b):
+        c = b[i]
+        i += 1
+        if c == 0x20:
+            out.append(0)
+        elif 0x41 <= c <= 0x5A:
+            out.append(c - 0x41 + 28)
+        elif 0x61 <= c <= 0x7A:
+            out.append(c - 0x61 + 54)
+        else:
+            c = (c << 8) | (b[i] if i < len(b) else 0)
+            i += 1
+            if c == 0x8168:
+                i += 2
+            if 0x824F <= c < 0x824F + 10:
+                out.append(c - 0x824F + 18)
+            elif 0x8260 <= c < 0x8260 + 26:
+                out.append(c - 0x8260 + 28)
+            elif 0x8281 <= c < 0x8281 + 26:
+                out.append(c - 0x8281 + 54)
+            elif c in RT_SJIS81:
+                out.append(RT_SJIS81[c])
+            else:
+                return None
+    return out
+
+
+def rt_draw(b, w, font=None):
+    """ModRtText: the 16 rows of 2 * w pixel values (0, RT_SHADOW, RT_BODY)
+    of b drawn into a cleared line of w bytes a row, and the string's
+    extent (the first column right of every lit pixel, uncut); None when
+    the font lacks a character"""
+    widths, glyphs = font or rt_font()
+    gs = rt_glyphs(b)
+    if gs is None:
+        return None
+    end = 2 * w
+    px = [[0] * end for _ in range(16)]
+    pen = extent = 0
+    for g in gs:
+        prev = 0
+        for r in range(13):
+            m = glyphs[12 * g + r] << 8 if r < 12 else 0
+            sh = ((m | prev) >> 1) | prev
+            prev = m
+            for k in range(9):
+                bit = 0x8000 >> k
+                v = RT_BODY if m & bit else RT_SHADOW if sh & bit else 0
+                if v:
+                    extent = max(extent, pen + k + 1)
+                    if pen + k < end:
+                        px[RT_ROW0 + r][pen + k] |= v
+        pen += widths[g]
+    return px, extent
+
+
+_RT_FONT = None
+
+
+def rt_width(b):
+    """pixels b spans in the retranslation's font (None: it lacks a
+    character)"""
+    global _RT_FONT
+    if _RT_FONT is None:
+        _RT_FONT = rt_font()
+    r = rt_draw(b, 0x90, _RT_FONT)
+    return None if r is None else r[1]
+
+
+def line_width(b):
+    """what func_800F99B8 spans with the RT pack applied: the RT font, or
+    the BIOS font (estimate) for a string the RT font cannot draw"""
+    w = rt_width(b)
+    return bios_width(b) if w is None else w
 
 
 # --- fit limits of the US drawing code (see the report) --------------------
@@ -555,7 +666,7 @@ def measure(e, data):
         return len(data), 14
     if unit == "chars":
         return len(data), lim
-    w = bios_width(data)
+    w = line_width(data)
     if e.context == "spell_name" and len(data) > 31:
         return 999, lim
     return w, lim
@@ -639,12 +750,14 @@ def save_messages(ram, syms, jp):
         assert inside == [lo + a], ("save message literal referenced inside", us_s, [hex(t) for t in inside])
         text = msgs[k]
         body = to_bios(text)
-        w = bios_width(body)
+        w = line_width(body)
         if box is None:
             pad = len(us) - len(us.lstrip(b" "))
         else:
-            # centred like the US text: leading spaces of 6 px
-            pad = max(0, (box - w) // 2 // 6) if w is not None else 0
+            # centred like the US text, with leading spaces (the RT font's
+            # space; the BIOS font's is 6 px)
+            sp = rt_font()[0][0] if rt_width(body) is not None else 6
+            pad = max(0, (box - w) // 2 // sp) if w is not None else 0
         new = b" " * pad + body
         why = ""
         if w is None or (box is not None and w > box):
