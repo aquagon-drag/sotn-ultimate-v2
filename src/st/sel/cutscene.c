@@ -619,7 +619,11 @@ s32 func_801B79D4(Entity* entity) {
 
     switch (entity->step) {
     case 0:
-        if (func_801B76F0(cutscene_credits)) {
+        if (func_801B76F0(
+                CREDITS_PSP() ? cutscene_credits_psp : cutscene_credits)) {
+#if defined(MOD_SATURN)
+            g_Dialogue.unk17 = 0; // the scroll's step pattern (below)
+#endif
             entity->flags |= FLAG_HAS_PRIMS;
             entity->primIndex = (s32)g_Dialogue.prim[1];
             entity->step++;
@@ -671,7 +675,8 @@ s32 func_801B79D4(Entity* entity) {
         switch (nextChar) {
         case CSOP_END_CREDITS:
             entity->step = 7;
-            g_Dialogue.unk12 = 0x400;
+            g_Dialogue.unk12 =
+                CREDITS_PSP() ? MOD_CREDITS_PSP_END_TICKS : 0x400;
             return 0;
         case CSOP_SUBTEXT:
             g_Dialogue.startY = g_Dialogue.nextCharX + *g_Dialogue.scriptCur++;
@@ -703,7 +708,7 @@ s32 func_801B79D4(Entity* entity) {
                 }
                 prim = prim->next;
             }
-            g_Dialogue.unk12 += 0x18;
+            g_Dialogue.unk12 += CREDITS_PSP() ? MOD_CREDITS_PSP_ENTRY : 0x18;
             g_Dialogue.portraitAnimTimer += 6;
             g_Dialogue.nextCharY = 0;
             return 0;
@@ -728,7 +733,7 @@ s32 func_801B79D4(Entity* entity) {
                 }
                 prim = prim->next;
             }
-            g_Dialogue.unk12 += 0x30;
+            g_Dialogue.unk12 += CREDITS_PSP() ? MOD_CREDITS_PSP_SECTION : 0x30;
             g_Dialogue.portraitAnimTimer += 12;
             g_Dialogue.nextCharY = 0;
             return 0;
@@ -774,9 +779,11 @@ s32 func_801B79D4(Entity* entity) {
     if (!g_Dialogue.unk12) {
         func_801B786C(g_Dialogue.nextLineX);
         g_Dialogue.nextCharY = 1;
-        g_Dialogue.unk12 = 76;
+        g_Dialogue.unk12 = CREDITS_PSP() ? MOD_CREDITS_PSP_LINE : 76;
     }
-    g_Dialogue.unk12--;
+    if (!CREDITS_PSP()) {
+        g_Dialogue.unk12--; // (the PSP roll's timers count pixels, below)
+    }
     if (!g_Dialogue.clutIndex) {
         prim = g_Dialogue.prim[0];
         for (i = 0; i < 0x20; i++) {
@@ -787,7 +794,16 @@ s32 func_801B79D4(Entity* entity) {
             }
             prim = prim->next;
         }
-        g_Dialogue.clutIndex = 4;
+        if (CREDITS_PSP()) {
+            if (g_Dialogue.unk12) {
+                g_Dialogue.unk12--;
+            }
+            g_Dialogue.clutIndex = (g_Dialogue.unk17++ & 3)
+                                       ? MOD_CREDITS_PSP_PERIOD_SHORT
+                                       : MOD_CREDITS_PSP_PERIOD_LONG;
+        } else {
+            g_Dialogue.clutIndex = 4;
+        }
     }
     g_Dialogue.clutIndex--;
     return 0;

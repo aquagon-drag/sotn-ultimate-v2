@@ -146,6 +146,21 @@ extern SpriteParts* g_SpriteBanks[];
 
 extern u8 cutscene_endings[];
 extern u8 cutscene_credits[];
+#if defined(MOD_SATURN)
+// the staff roll with Ending = PSP (game_mod.h MOD_CREDITS_PSP_*), in SEL's
+// dead config copy (config_us.c)
+extern u8 cutscene_credits_psp[];
+#define CREDITS_PSP() MOD_ENDING_PSP()
+#else
+#define cutscene_credits_psp cutscene_credits
+#define CREDITS_PSP() 0
+#define MOD_CREDITS_PSP_LINE 0
+#define MOD_CREDITS_PSP_ENTRY 0
+#define MOD_CREDITS_PSP_SECTION 0
+#define MOD_CREDITS_PSP_PERIOD_LONG 0
+#define MOD_CREDITS_PSP_PERIOD_SHORT 0
+#define MOD_CREDITS_PSP_END_TICKS 0
+#endif
 extern s32 g_StreamWidth;
 extern int g_StreamHeight;
 
