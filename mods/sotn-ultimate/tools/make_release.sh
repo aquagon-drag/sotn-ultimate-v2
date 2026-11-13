@@ -51,6 +51,12 @@ if ! grep -q "^#define MOD_TEXT_RT_ON 0" mods/sotn-ultimate/include/mod_text_rt.
     echo "FAIL the release disc has the retranslation pack (mod_text_rt.h)" >&2
     exit 1
 fi
+# (the pack would also hold the retranslation's font: the file must be the
+# one empty sector)
+if [ "$(stat -c %s build/us/TXT_RT.BIN)" -ne 2048 ] || [ -n "$(tr -d '\0' < build/us/TXT_RT.BIN | head -c 1)" ]; then
+    echo "FAIL the release disc's SD/TXT_RT.BIN is not empty" >&2
+    exit 1
+fi
 want=$(md5sum "$DISC" | cut -d" " -f1)
 echo "disc: $DISC md5 $want"
 # 2. + 3.

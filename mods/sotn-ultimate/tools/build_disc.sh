@@ -291,10 +291,6 @@ bash mods/sotn-ultimate/tools/build_cenp.sh
 # after Alucard's sprites in build/us/ARC_F2.BIN (mods/sotn-ultimate/src/menu/sysopt.c),
 # against DRA's addresses (checked again after make disk below)
 bash mods/sotn-ultimate/tools/build_sysopt.sh
-# Script = Retrans: the retranslation font's code for DRA's BIOS-font text
-# (mods/sotn-ultimate/src/menu/rt_font.c), carried by the RT pack with the
-# font from disks/jpre (text_packs.py); against DRA's addresses
-bash mods/sotn-ultimate/tools/build_rtfont.sh
 # Richter in the coat in the endings: build/us/SELRIC2.BIN (SEL.BIN + the
 # RIC2 art); made again below from the final SEL
 (cd mods/sotn-ultimate/tools && python3 build_selric2.py)
@@ -322,6 +318,11 @@ if [ "$MOD_PSP_DUB" = 1 ]; then
         remake=1
     fi
 fi
+# Script = Retrans: the retranslation font's code for DRA's BIOS-font text
+# (mods/sotn-ultimate/src/menu/rt_font.c), carried by the RT pack with the
+# font from disks/jpre; against the final DRA (make disk relinked it with
+# the new MOD_DRA_PAD)
+bash mods/sotn-ultimate/tools/build_rtfont.sh
 out=$(cd mods/sotn-ultimate/tools && python3 text_packs.py --apply)
 echo "$out"
 if echo "$out" | grep -qE "\((SEL|TXT_RT)\.BIN"; then

@@ -63,8 +63,12 @@ version, romhacking.net #1427) needs the files of your own patched Japanese
 disc (SLPM-86023 Rev 2 with that patch applied) extracted in `disks/jpre`
 (only `DRA.BIN` is read, checked by SHA-1; `MOD_JPRE_DIR` points elsewhere).
 Nothing of that translation is in this repository: the build makes its text
-pack from those files (`mods/sotn-ultimate/tools/text_rt.py`). Without them the build
-still succeeds and Script = Retrans shows the dub's text. The fit report for
+pack from those files (`mods/sotn-ultimate/tools/text_rt.py`), and the pack also
+carries that patch's 12 px proportional font (glyphs and widths from the same
+`DRA.BIN`), with which DRA then draws descriptions, help lines, relic and
+spell names and save messages (`mods/sotn-ultimate/src/menu/rt_font.c`).
+Without them the build still succeeds and Script = Retrans shows the dub's
+text in the BIOS font. The fit report for
 translators: `python3 mods/sotn-ultimate/tools/text_rt.py --report FILE` (write it
 outside the repository: it quotes the text); wording decisions go in
 `disks/jpre/rt_overrides.tsv` (format:
@@ -401,7 +405,13 @@ DRA has no room for some features, so they live elsewhere:
   (`ModTextReady`) and by the System popup when the Script row changes; and a
   restore pack in SEL's dead copy that puts back every byte and pointer the
   retranslation pack writes, applied before a dub's pack whenever the RAM is
-  not already a dub's. `check_text_packs.py` also proves round trips between
+  not already a dub's. The retranslation pack also writes the retranslation
+  font's code (`mods/sotn-ultimate/src/menu/rt_font.c`, built by
+  `build_rtfont.sh`), width table and glyphs into the 2,400 B between DRA's
+  BSS end and the player file (`MOD_RT_FONT_ADDR`, DRA.BIN's boot-time sound
+  bank, dead after boot); DRA's BIOS-font renderer (`func_800F99B8`) calls it
+  while `g_ModDub.textPack` is the retranslation's tag (36 B of DRA).
+  `check_text_packs.py` also proves round trips between
   all packs and dubs, that every pointer written lands in a string the pack
   writes, and that nothing is written outside DRA's string segments, the
   overflow rooms and the save message literals.

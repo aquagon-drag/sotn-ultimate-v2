@@ -763,9 +763,9 @@ def save_messages(ram, syms, jp):
         if w is None or (box is not None and w > box):
             why, new = "wider than its box (%s px of %d)" % (w, box), None
         elif len(new) + 1 > room:
-            # without the centring
+            # as centred as the literal's bytes allow
             if len(body) + 1 <= room:
-                new = body
+                new = b" " * (room - 1 - len(body)) + body
             else:
                 why, new = "%d bytes, the literal has %d" % (len(body) + 1, room), None
         if new is not None:
