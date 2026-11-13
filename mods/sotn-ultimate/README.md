@@ -58,6 +58,19 @@ the PS1 disc as sotn-decomp expects it, the Saturn disc's files in
 `disks/saturn`, and the US UMD's `PSP_GAME/USRDIR/res/ps` in `disks/psp`
 (`mods/sotn-ultimate/tools/extract_psp.sh PSP.iso`). The European UMD is not used.
 
+Optional: Script = Retrans (the English fan retranslation of the Japanese
+version, romhacking.net #1427) needs the files of your own patched Japanese
+disc (SLPM-86023 Rev 2 with that patch applied) extracted in `disks/jpre`
+(only `DRA.BIN` is read, checked by SHA-1; `MOD_JPRE_DIR` points elsewhere).
+Nothing of that translation is in this repository: the build makes its text
+pack from those files (`mods/sotn-ultimate/tools/text_rt.py`). Without them the build
+still succeeds and Script = Retrans shows the dub's text. The fit report for
+translators: `python3 mods/sotn-ultimate/tools/text_rt.py --report FILE` (write it
+outside the repository: it quotes the text); wording decisions go in
+`disks/jpre/rt_overrides.tsv` (format:
+`mods/sotn-ultimate/tools/text_rt_overrides.template.tsv`). `make_release.sh` always
+builds without them, so a release never carries the retranslation.
+
 ```sh
 # the disc: build/sotn_ultimate.bin (MOD_OUT=... to put it elsewhere)
 bash mods/sotn-ultimate/tools/build_disc.sh
@@ -380,6 +393,18 @@ DRA has no room for some features, so they live elsewhere:
   `mods/sotn-ultimate/src/menu/text_pack.h`; DRA has no code for it.
   `check_text_packs.py` checks the chunks in SEL and on the disc and proves
   the PS1 / PSP packs equal the per-frame mechanism they replaced.
+  Script = Retrans adds two packs (only when `disks/jpre` was there:
+  `mod_text_rt.h`, `MOD_TEXT_RT_ON`): the retranslation pack (`text_rt.py`:
+  strings repacked into DRA's string segments and the overflow rooms, table
+  pointers rewritten) in `SD/TXT_RT.BIN`, read through the same
+  `CdFile_DemoKey` entry by SEL at the end of the fade into a game
+  (`ModTextReady`) and by the System popup when the Script row changes; and a
+  restore pack in SEL's dead copy that puts back every byte and pointer the
+  retranslation pack writes, applied before a dub's pack whenever the RAM is
+  not already a dub's. `check_text_packs.py` also proves round trips between
+  all packs and dubs, that every pointer written lands in a string the pack
+  writes, and that nothing is written outside DRA's string segments, the
+  overflow rooms and the save message literals.
 - **The JP dub tables.** They are SEL rodata. SEL copies them into
   `g_ModDub.jp` every frame its menu runs, and every way into a game passes
   through there.
@@ -492,6 +517,11 @@ before `XA`:
 
 The new stages use the four unused `TE1`-`TE4` stage slots, so they need no
 new files (section 7).
+
+One more file goes after everything else, as the disc's last file:
+`SD/TXT_RT.BIN`, the retranslation's text pack (`text_packs.py --apply`; one
+empty sector without `disks/jpre`). Being last, it moves no other file;
+`SD` had room for its directory record.
 
 Why the files go there: the literal sector numbers in `src/dra/cd.c` and SEL
 stay right only while every file before them keeps its place

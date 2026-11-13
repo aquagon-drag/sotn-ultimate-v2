@@ -31,6 +31,13 @@ DISC=build/sotn_ultimate.bin
 
 # 1. (build_disc.sh starts again by itself when the layout moved; when it
 # asks for another run, once more)
+# The release never carries the fan retranslation (Script = Retrans): its
+# pack is made only from the builder's own patched Japanese disc files
+# (disks/jpre, mods/sotn-ultimate/tools/text_rt.py), and the patch would
+# hold its text. So this build reads no such files: Script = Retrans shows
+# the dub's text, as in any build without them.
+export MOD_JPRE_DIR="$PWD/build/no-jpre"
+rm -rf "$MOD_JPRE_DIR"
 mkdir -p build
 for pass in 1 2; do
     if MOD_OUT=$DISC bash mods/sotn-ultimate/tools/build_disc.sh 2>&1 | tee build/make_release.log; then
@@ -40,6 +47,10 @@ for pass in 1 2; do
         exit 1
     fi
 done
+if ! grep -q "^#define MOD_TEXT_RT_ON 0" mods/sotn-ultimate/include/mod_text_rt.h; then
+    echo "FAIL the release disc has the retranslation pack (mod_text_rt.h)" >&2
+    exit 1
+fi
 want=$(md5sum "$DISC" | cut -d" " -f1)
 echo "disc: $DISC md5 $want"
 # 2. + 3.
