@@ -296,6 +296,23 @@ def rt_hook_check(d, syms, dra):
         words[i + 1] & 0xFFFF == lo for i in range(max(0, k[0] - 6), k[0]))
     if not ok:
         fail("DRA's func_800F99B8 does not call the RT font (jal 0x%X after lbu textPack)" % a)
+    # the 8 px font: MenuDrawChar calls ModRt8Char (jal MOD_RT8_ADDR) only
+    # after reading the same byte
+    f8 = syms["MenuDrawChar"] - tp.DRA_BASE
+    w8 = struct.unpack_from("<%dI" % 0x30, dra, f8)
+    a8 = d["MOD_RT8_ADDR"]
+    jal8 = 0x0C000000 | ((a8 >> 2) & 0x3FFFFFF)
+    k8 = [i for i, w in enumerate(w8) if w == jal8]
+    ok8 = len(k8) == 1 and any(
+        w8[i] >> 26 == 0xF and w8[i] & 0xFFFF == hi and w8[i + 1] >> 26 == 0x24 and
+        w8[i + 1] & 0xFFFF == lo for i in range(max(0, k8[0] - 8), k8[0]))
+    rs8 = nm(os.path.join(tp.RTFONT, "rtfont.elf"))
+    if not ok8 or rs8.get("ModRt8Char") != a8 or rs8.get("MenuDrawChar") != syms["MenuDrawChar"]:
+        fail("DRA's MenuDrawChar does not call the RT 8 px font (jal 0x%X after lbu textPack), "
+             "or rtfont.elf is not linked against this DRA" % a8)
+    else:
+        print("OK   text packs: DRA's MenuDrawChar calls the RT 8 px font at 0x%X when the RT "
+              "pack's tag is set" % a8)
     rs = nm(os.path.join(tp.RTFONT, "rtfont.elf"))
     if rs.get("ModRtText") != a or rs.get("D_8013794C") != syms["D_8013794C"]:
         fail("rtfont.elf is not linked at 0x%X against this DRA (build_rtfont.sh)" % a)

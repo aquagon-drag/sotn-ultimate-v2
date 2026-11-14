@@ -32,3 +32,4 @@ D_us_801BFB20 = 0x801BFB20;
 D_us_801CC998 = 0x801CC998;
 D_us_801DDBD4 = 0x801DDBD4;
 ModRtText = 0x8013B6A0; /* SOTN Ultimate: include/game_mod.h MOD_RT_FONT_ADDR (mods/sotn-ultimate/src/menu/rt_font.c) */
+ModRt8Char = 0x8013BF20; /* SOTN Ultimate: include/game_mod.h MOD_RT8_ADDR (mods/sotn-ultimate/src/menu/rt_font8.c) */

@@ -295,6 +295,9 @@ cat build/us/MARIA2_SD_PS1.BIN >> build/us/MARIA_SD_PS1.BIN
 bash mods/sotn-ultimate/tools/build_cenp.sh
 # her Saturn HUD art in F_GAME2's empty VRAM: build/us/F_GAME2.BIN
 .venv/bin/python mods/sotn-ultimate/tools/gen_mar_hud.py
+# Script = Retrans: the retranslation's 8 px glyphs in the font page's unused
+# tiles (build/us/F_GAME.BIN, F_GAME2.BIN; only with disks/jpre)
+(cd mods/sotn-ultimate/tools && python3 gen_rt_font8.py)
 # the pause menu System screen's "Ultimate settings" (Alucard games): code
 # after Alucard's sprites in build/us/ARC_F2.BIN (mods/sotn-ultimate/src/menu/sysopt.c),
 # against DRA's addresses (checked again after make disk below)

@@ -312,6 +312,61 @@ def line_width(b):
     return bios_width(b) if w is None else w
 
 
+# --- the retranslation's 8 px font (Script = Retrans) -----------------------
+# DRA's MenuDrawChar / MenuDrawStr (item and menu names, numbers) draw with
+# the patch's 8x8 proportional glyphs while the RT pack is applied
+# (mods/sotn-ultimate/src/menu/rt_font8.c). The glyphs are tiles of the
+# patched disc's font page (BIN/F_GAME.BIN, file 0x30000: 128x128, 4 bpp),
+# which gen_rt_font8.py copies into the US page's tiles RT8_TILE0.. in the
+# US character order; the advances are the patch's table in its DRA.BIN.
+JP_FGAME = os.path.join(INPUT_DIR, "BIN", "F_GAME.BIN")
+JP_FGAME_SHA1 = "01e4a76232a68f2ce8590e73a59711b866c92852"
+JP_FONT8_W = 0x40D50  # the advance of each ENC8 code, pixels
+FONT8_PAGE = 0x30000
+RT8_CHARS, RT8_TILE0 = 0x60, 0x60  # as game_mod.h MOD_RT8_CHARS / MOD_RT8_TILE0
+# the patch's tile of a character where it is not ASCII - 0x20 (ENC8_SUB;
+# 0x0C is its tilde), and the code whose advance a space has (its space is
+# 0x5F; tile 0 is blank)
+RT8_CODE = {",": 0x07, "'": 0x1B, "~": 0x0C}
+RT8_SPACE = 0x5F
+RT8_NONE = "[]_"  # the patch has accented letters there: the US glyph stays
+
+
+def rt8_table():
+    """for each US 8x8 code below RT8_CHARS: (the patch's tile, or None for
+    the US glyph; the pen's advance)"""
+    w = open(JP_DRA, "rb").read()[JP_FONT8_W:JP_FONT8_W + 0x70]
+    out = []
+    for c in range(RT8_CHARS):
+        ch = chr(c + 0x20)
+        if ch == " ":
+            out.append((0, w[RT8_SPACE]))
+        elif ch in S_CHARS and ch not in RT8_NONE:
+            t = RT8_CODE.get(ch, c)
+            out.append((t, w[t]))
+        else:
+            out.append((None, 8))
+    return out
+
+
+_RT8 = None
+
+
+def rt8_on():
+    """the 8 px font is part of the RT pack (the patched disc's DRA.BIN is
+    there; gen_rt_font8.py then insists on its BIN/F_GAME.BIN)"""
+    return os.path.exists(JP_DRA)
+
+
+def rt8_width(b):
+    """pixels MenuDrawStr's pen moves over the US 8x8 bytes b with the RT
+    pack applied"""
+    global _RT8
+    if _RT8 is None:
+        _RT8 = rt8_table()
+    return sum(_RT8[c][1] if c < RT8_CHARS else 8 for c in b)
+
+
 # --- fit limits of the US drawing code (see the report) --------------------
 # (unit, limit, where)
 LIMITS = {
@@ -333,6 +388,7 @@ LIMITS = {
     "combo": ("chars", None, "spell inputs (kept)"),
     "savemsg": ("px", None, "the message box's width (62DEC.c), and the literal's bytes"),
 }
+ITEM_NAME_POPUP = 25  # as enemy_name: the overlays' bottom-corner box
 # g_MenuStr: the characters (8 px) each index has where menu.c draws it,
 # up to the next thing drawn on its row (the smallest where it is drawn
 # twice); absent: not drawn by the US code
@@ -661,9 +717,20 @@ def measure(e, data):
     unit, lim, _ = LIMITS[e.context]
     if e.context == "menu":
         lim = MENU_LIMIT.get(e.idx)
+        if rt8_on():
+            # DRA draws these with the RT 8 px font: pixels, in the room the
+            # US code leaves (8 px a character)
+            return (rt8_width(data), lim * 8) if lim else (rt8_width(data), None)
         return (len(data), lim) if lim else (len(data), None)
-    if e.context == "item_name" and e.consumable:
-        return len(data), 14
+    if e.context == "item_name":
+        n = 14 if e.consumable else lim
+        if rt8_on():
+            # stage overlays draw the same name with the US 8 px font (item
+            # pickups: st/popup.h, as enemy names, ITEM_NAME_POPUP characters)
+            if len(data) > ITEM_NAME_POPUP:
+                return 999, n * 8
+            return rt8_width(data), n * 8
+        return len(data), n
     if unit == "chars":
         return len(data), lim
     w = line_width(data)

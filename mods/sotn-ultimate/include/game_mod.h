@@ -418,6 +418,17 @@ typedef struct {
 #define MOD_RT_FONT_ADDR 0x8013B6A0
 #define MOD_RT_FONT_END 0x8013C000
 #define MOD_RT_GLYPHS 112
+// Script = Retrans: the retranslation's 8 px proportional font for DRA's 8x8
+// menu font (mods/sotn-ultimate/src/menu/rt_font8.c): ModRt8Char at
+// MOD_RT8_ADDR, after rt_font.c's code and font in the same room, and the
+// advance of each US character in the room's last MOD_RT8_CHARS bytes; the
+// glyphs are the font page's tiles from MOD_RT8_TILE0
+// (mods/sotn-ultimate/tools/gen_rt_font8.py). MenuDrawChar's ch with
+// MOD_RT8_FINAL set is a tile ModRt8Char has already chosen
+#define MOD_RT8_ADDR 0x8013BF20
+#define MOD_RT8_CHARS 0x60
+#define MOD_RT8_TILE0 0x60
+#define MOD_RT8_FINAL 0x100
 typedef struct {
     u32 cfg[4]; // ModXaConfig's redirected XaMusicConfig
     ModJpDubTable jp;

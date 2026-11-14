@@ -128,7 +128,7 @@ def c_defines():
     """the MOD_TEXT_* numbers of include/game_mod.h and the SEL sector of
     include/lba_us.h, as the C code computes them"""
     src = open(os.path.join(ROOT, "mods/sotn-ultimate/include/game_mod.h"), encoding="utf-8").read()
-    d = {k: int(v, 0) for k, v in re.findall(r"#define (MOD_TEXT_\w+|MOD_RT_\w+|MOD_DUB_STATE_ADDR) +(0x[0-9A-Fa-f]+|\d+)\b", src)}
+    d = {k: int(v, 0) for k, v in re.findall(r"#define (MOD_TEXT_\w+|MOD_RT8?_\w+|MOD_DUB_STATE_ADDR) +(0x[0-9A-Fa-f]+|\d+)\b", src)}
     lba = open(os.path.join(ROOT, "include/lba_us.h")).read()
     d["ST_SEL_BIN_OFF"] = int(re.search(r"#define ST_SEL_BIN_OFF (0x[0-9A-Fa-f]+)", lba)[1], 16)
     first = d["MOD_TEXT_BLOB_FIRST"]
@@ -426,8 +426,17 @@ def rt_font_blob(d):
     w, g = syms["g_ModRtW"], syms["g_ModRtGlyph"]
     assert a + len(code) <= w and g == w + len(widths) and syms["g_ModRtEnd"] == g + len(glyphs)
     blob = code + bytes(w - a - len(code)) + widths + glyphs
-    assert a + len(blob) <= d["MOD_RT_FONT_END"]
-    return blob + bytes(-len(blob) % 4)
+    # the 8 px font (rt_font8.c): ModRt8Char at MOD_RT8_ADDR, then the
+    # advance of each US character in the room's last MOD_RT8_CHARS bytes
+    a8, w8, end = d["MOD_RT8_ADDR"], syms["g_ModRtW8"], d["MOD_RT_FONT_END"]
+    code8 = open(os.path.join(RTFONT, "rtfont8.bin"), "rb").read()
+    adv = bytes(x for _, x in text_rt.rt8_table())
+    assert d["MOD_RT8_CHARS"] == text_rt.RT8_CHARS == len(adv) and d["MOD_RT8_TILE0"] == text_rt.RT8_TILE0
+    assert syms["ModRt8Char"] == a8 and a + len(blob) <= a8, "rtfont: no room before MOD_RT8_ADDR"
+    assert a8 + len(code8) <= w8 and w8 + len(adv) == end, "rtfont: ModRt8Char runs into its widths"
+    blob += bytes(a8 - a - len(blob)) + code8 + bytes(w8 - a8 - len(code8)) + adv
+    assert a + len(blob) == end
+    return blob
 
 
 def rt_layout(d, lba):

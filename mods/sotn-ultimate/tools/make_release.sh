@@ -57,6 +57,11 @@ if [ "$(stat -c %s build/us/TXT_RT.BIN)" -ne 2048 ] || [ -n "$(tr -d '\0' < buil
     echo "FAIL the release disc's SD/TXT_RT.BIN is not empty" >&2
     exit 1
 fi
+# (and its 8 px glyphs would be in the font page: gen_rt_font8.py)
+if ! cmp -s build/us/F_GAME.BIN disks/us/BIN/F_GAME.BIN; then
+    echo "FAIL the release disc's BIN/F_GAME.BIN is not the US file (the retranslation's 8 px font?)" >&2
+    exit 1
+fi
 want=$(md5sum "$DISC" | cut -d" " -f1)
 echo "disc: $DISC md5 $want"
 # 2. + 3.

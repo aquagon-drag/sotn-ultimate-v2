@@ -944,10 +944,27 @@ void func_800F66BC(
     }
 }
 
+#if defined(VERSION_US) && defined(MOD_RT8_ADDR)
+// Script = Retrans: while the RT pack is applied, the retranslation's 8 px
+// proportional font (mods/sotn-ultimate/src/menu/rt_font8.c, in the RT
+// font's room: config/undefined_syms.us.txt) picks the tile and comes back
+// here with MOD_RT8_FINAL set. Returns the pen's advance (MenuDrawStr)
+s32 ModRt8Char(u32 ch, s32 x, s32 y, MenuContext* ctx);
+s32 MenuDrawChar(u32 ch, s32 x, s32 y, MenuContext* ctx) {
+    if (ch < MOD_RT8_FINAL &&
+        *(u8*)&MOD_DUB_STATE->textPack == MOD_TEXT_PACK_RT) {
+        return ModRt8Char(ch, x, y, ctx);
+    }
+    MenuDrawImg(
+        ctx, x, y, 8, 8, (ch & 0xF) * 8, (ch & 0xF0) >> 1, 0x196, 0x1E, 1, 0);
+    return 8;
+}
+#else
 void MenuDrawChar(char ch, s32 x, s32 y, MenuContext* ctx) {
     MenuDrawImg(
         ctx, x, y, 8, 8, (ch & 0xF) * 8, (ch & 0xF0) >> 1, 0x196, 0x1E, 1, 0);
 }
+#endif
 
 void MenuDrawStr(const char* str, s32 x, s32 y, MenuContext* ctx) {
     const s32 ChWidth = 8;
@@ -986,8 +1003,12 @@ void MenuDrawStr(const char* str, s32 x, s32 y, MenuContext* ctx) {
                 x -= ChWidth;
             }
         }
+#if defined(VERSION_US) && defined(MOD_RT8_ADDR)
+        x += MenuDrawChar(ch, xcopy, ycopy, ctx);
+#else
         MenuDrawChar(ch, xcopy, ycopy, ctx);
         x += ChWidth;
+#endif
     }
     D_80137614 = 1;
     func_800F53D4(0x1E, ctx->otIdx + 2);
