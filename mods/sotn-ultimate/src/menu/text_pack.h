@@ -47,9 +47,37 @@ typedef char ModTextLayout[sizeof(ModDubState) == 4096 &&
                                ? 1
                                : -1];
 
+// (SEL makes these global: its CD reader, ModTextReady, runs from its dead
+// config copy, src/st/sel/mod_text_cd.inc)
+#ifndef MOD_TEXT_FN
+#define MOD_TEXT_FN static
+#endif
+
+// A chunk's read gets MOD_TEXT_CD_WAIT vblanks (DRA's loader has no timeout:
+// CdStep_5 waits for its sectors for ever). Then it is stopped as the
+// loader's CdStep_Retry does (CdInit: the drive reset; the callbacks off
+// first, as func_8010838C does), without MuteSound (the music is the
+// game's, not this read's) and without D_800ACD7C (that would read the
+// next file twice), and read again from CdStep_LoadInit; MOD_TEXT_CD_TRIES
+// reads in all per chunk
+#define MOD_TEXT_CD_WAIT 240 // 4 s (a chunk takes ~0.1-0.5 s)
+#define MOD_TEXT_CD_TRIES 3
+#define MOD_TEXT_CD_STOP()                                                     \
+    do {                                                                       \
+        CdReadyCallback(NULL);                                                 \
+        CdDataCallback(NULL);                                                  \
+        CdInit();                                                              \
+        g_LoadFile = CdFile_None;                                              \
+        g_CdStep = CdStep_None;                                                \
+    } while (0)
+
+#if defined(MOD_TEXT_PROTOS) // (SEL's reader: sel_text_cd.c)
+s32 ModTextChunkOk(const u8* c, s32 i);
+void ModTextRun(const u8* c, s32 pack);
+#else
 // the chunk's header and sum are right and it is chunk i (a buffer the CD
 // did not fill, or that something else wrote, is not applied)
-static s32 ModTextChunkOk(const u8* c, s32 i) {
+MOD_TEXT_FN s32 ModTextChunkOk(const u8* c, s32 i) {
     const u16* h = (const u16*)c;
     const u16* w;
     u32 sum = 0;
@@ -66,7 +94,7 @@ static s32 ModTextChunkOk(const u8* c, s32 i) {
 }
 
 // applies one pack's records found in this chunk
-static void ModTextRun(const u8* c, s32 pack) {
+MOD_TEXT_FN void ModTextRun(const u8* c, s32 pack) {
     const u16* r;
     const u8* s;
     u8* d;
@@ -99,3 +127,4 @@ static void ModTextRun(const u8* c, s32 pack) {
         }
     }
 }
+#endif

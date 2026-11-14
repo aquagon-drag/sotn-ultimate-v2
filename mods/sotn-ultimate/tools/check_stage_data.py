@@ -128,6 +128,16 @@ for name, retail_path in STAGES.items():
         off = int(m[1], 16) - base
         assert off == 0x25FC, hex(off)
         edited.append((off, off + area))
+        # SEL's text pack reader (ModTextReady + its state words,
+        # src/st/sel/mod_text_cd.inc): the MOD_TEXT_CD_AREA bytes after it,
+        # before the first text pack chunk (file offset 0x3000 at the
+        # earliest, text_packs.py; check_text_packs.py checks that too)
+        m = re.search(r"0x([0-9a-f]+)\s+g_ModTextCdArea\n", text)
+        assert m, "no g_ModTextCdArea in stsel.map"
+        cd_area = int(re.search(r"#define MOD_TEXT_CD_AREA (\w+)", open("mods/sotn-ultimate/include/game_mod.h").read())[1], 0)
+        cd_off = int(m[1], 16) - base
+        assert cd_off == off + area and cd_off + cd_area <= 0x3000, hex(cd_off)
+        edited.append((cd_off, cd_off + cd_area))
     bad = []
     for i in range(0, n, 4):
         if retail[i : i + 4] == built[i : i + 4]:

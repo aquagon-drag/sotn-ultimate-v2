@@ -163,8 +163,11 @@ def main():
             f = open(os.path.join(ROOT, "build/us", name), "rb").read()
             if f[0x25FC:0x25FC + area] != psp + bytes(area - len(psp)):
                 fail.append("%s: the table at 0x25FC is not credits_psp.bin + zero pad" % name)
-        print("     SEL table: %d of %d bytes used, %d spare before the text packs (0x3000)" % (
-            len(psp), area, 0x3000 - 0x25FC - len(psp)))
+        # (SEL's text pack reader follows the table: MOD_TEXT_CD_AREA)
+        cd = int(re.search(r"#define MOD_TEXT_CD_AREA (\w+)", open(os.path.join(
+            ROOT, "mods/sotn-ultimate/include/game_mod.h")).read())[1], 0)
+        print("     SEL table: %d of %d bytes used, %d spare before SEL's text pack reader (%d B) and "
+              "the text packs (0x3000)" % (len(psp), area, 0x3000 - 0x25FC - cd - len(psp), cd))
     for f in fail:
         print("FAIL", f)
     if fail:

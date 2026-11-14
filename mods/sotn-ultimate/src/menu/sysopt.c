@@ -269,8 +269,12 @@ static void SysOptBanks(void) {
 // closed: the bank loads below wait for the CD); applied on the first frame
 // the CD is idle again. g_LoadOvlIdx (set before every load by whoever loads)
 // gets its value back. The pack is latched: a change made meanwhile loads
-// again after. A chunk that fails the check is not applied (twice: given up
-// until the next game load). If the menu is left before the load ends, the
+// again after. A chunk that fails the check is not applied, and a read that
+// has not ended MOD_TEXT_CD_WAIT vblanks after it started is stopped
+// (MOD_TEXT_CD_STOP, text_pack.h; DRA's loader would wait for ever): each a
+// fail, after which the pass starts again; after two the retranslation
+// gives way to the dub's text, after four it is given up until the next
+// game load. If the menu is left before the load ends, the
 // text changes the next time the System screen shows (or at SEL)
 #include "text_pack.h"
 #define TEXT_BUF ((const u8*)0x801E8000) // DEMO_KEY_PTR
@@ -281,13 +285,22 @@ static s32 g_TextLoad = 0;  // 1 + the chunk on its way (0: none)
 static s32 g_TextPack = 0;  // the pack this pass applies
 static s32 g_TextNext = 0;  // 1 + the pack of the pass after it (0: none)
 static s32 g_TextOvl = 0;   // g_LoadOvlIdx before the load
-static s32 g_TextFails = 0; // chunks that failed the check
+static s32 g_TextFails = 0; // chunks that failed the check or timed out
+static s32 g_TextT0 = 0;    // VSync(-1) when the read started
 static void SysOptText(void) {
     s32 c;
     s32 tag;
+    s32 want;
 
     if (g_TextLoad) {
         if (g_CdStep != CdStep_None || g_IsUsingCd) {
+            // past its time (text_pack.h): stopped, a failed chunk
+            if (VSync(-1) - g_TextT0 > MOD_TEXT_CD_WAIT) {
+                MOD_TEXT_CD_STOP();
+                g_LoadOvlIdx = g_TextOvl;
+                g_TextLoad = 0;
+                g_TextFails++;
+            }
             return;
         }
         c = g_TextLoad - 1;
@@ -314,11 +327,17 @@ static void SysOptText(void) {
         }
     } else {
         tag = MOD_DUB_STATE->textPack;
-        if (tag == MOD_TEXT_TAG(MOD_TEXT_PACK_WANTED()) || g_TextFails >= 2 ||
+        want = MOD_TEXT_PACK_WANTED();
+        // the retranslation failed twice: the dub's text (a half-applied
+        // pack shows garbage), two more tries for that
+        if (g_TextFails >= 2 && want == MOD_TEXT_PACK_RT) {
+            want = MOD_TEXT_PACK_DUB();
+        }
+        if (tag == MOD_TEXT_TAG(want) || g_TextFails >= 4 ||
             g_CdStep != CdStep_None || g_IsUsingCd) {
             return;
         }
-        g_TextPack = MOD_TEXT_PACK_WANTED();
+        g_TextPack = want;
         g_TextNext = 0;
         if (g_TextPack != MOD_TEXT_PACK_RT &&
             tag != MOD_TEXT_TAG(MOD_TEXT_PACK_PS1) &&
@@ -337,6 +356,7 @@ static void SysOptText(void) {
     g_LoadFile = CdFile_DemoKey;
     g_CdStep = CdStep_LoadInit;
     g_TextLoad = c + 1;
+    g_TextT0 = VSync(-1);
 }
 
 // The box's input, while g_MenuStep is MOD_STEP_BOX: only when it is fully

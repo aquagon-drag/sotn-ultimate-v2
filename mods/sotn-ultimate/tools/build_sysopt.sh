@@ -79,7 +79,8 @@ VERSION=us mipsel-linux-gnu-cpp -Iinclude -Iinclude/psxsdk -Isrc/dra -lang-c \
 : > "$OUT/syms.txt"
 for s in func_800F5E68 MenuDrawStr MenuHandleCursorInput D_8013784C \
     g_Entities MenuSoundConfigDraw g_Menus g_MenuInit g_LbaSdAlkVh \
-    g_LbaSdAlkVb g_CdStep g_IsUsingCd g_LoadFile g_ServantLoaded g_MenuStep     g_LoadOvlIdx g_StageId SsUtAllKeyOff; do
+    g_LbaSdAlkVb g_CdStep g_IsUsingCd g_LoadFile g_ServantLoaded g_MenuStep     g_LoadOvlIdx g_StageId SsUtAllKeyOff VSync CdInit CdReadyCallback \
+    CdDataCallback; do
     a=$(mipsel-linux-gnu-nm build/us/dra.elf | awk -v s="$s" '$3==s{print $1}')
     if [ -z "$a" ]; then # (main SDK functions: config/symbols.us.txt)
         a=$(awk -v s="$s" '$1==s{sub(/;/,"",$3); sub(/^0x/,"",$3); print $3}' config/symbols.us.txt)

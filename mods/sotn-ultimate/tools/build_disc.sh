@@ -53,6 +53,9 @@ LBA_BEFORE=$(sha1sum include/lba_us.h 2>/dev/null || true)
 (cd mods/sotn-ultimate/tools && python3 text_packs.py --header)
 mkdir -p build/us
 [ -f build/us/TXT_RT.BIN ] || head -c 2048 /dev/zero > build/us/TXT_RT.BIN
+# SEL's RT pack reader runs from its dead config copy: src/st/sel/
+# mod_text_cd.inc must be sel_text_cd.c's cc1 output (gen_sel_text_cd.sh)
+bash mods/sotn-ultimate/tools/gen_sel_text_cd.sh --check
 python3 mods/sotn-ultimate/tools/gen_mod_layouts.py
 # the staff roll of Ending = PSP (SEL's dead config copy, config_us.c)
 python3 mods/sotn-ultimate/tools/gen_credits_psp.py

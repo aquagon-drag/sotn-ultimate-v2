@@ -215,6 +215,11 @@ def main():
     if rt_packs:
         rt_proof(d, syms, dra, dub, chunks, rt_chunks, sel_packs, rt_packs, rt_info)
 
+    # 6. the CD readers (SEL's ModTextReady, sysopt's SysOptText): where
+    # SEL's runs, the DRA addresses it reads, and their state machines with
+    # reads that end, fail their check or never end (timeouts)
+    cd_reader_check(d, syms, sel_syms, chunks, rt_chunks, rt_packs, dra, dub)
+
     if bad:
         sys.exit(1)
     print("OK   text packs: SEL dead copy %d of %d B used; %s" % (
@@ -619,6 +624,274 @@ def synth_test(d, syms, dra, dub):
         print("OK   text packs: synthetic %d-string %d B pack + %d pointers round-trips in %d chunk(s) "
               "(pool 0x%X-0x%X %d B + rooms %d B)" % (len(texts), total, len(slots), len(chunks), lo, hi,
                                                       hi - lo, sum(r[1] for r in rooms[1:])))
+
+
+# --- the CD readers' state machines (sel_text_cd.c, sysopt.c SysOptText) --
+def text_pack_h_defines():
+    src = open(os.path.join(ROOT, "mods/sotn-ultimate/src/menu/text_pack.h")).read()
+    return {k: int(v, 0) for k, v in re.findall(r"#define (MOD_TEXT_CD_\w+) +(\d+)", src)}
+
+
+class Cd:
+    """DRA's loader as the readers see it: a read started (g_CdStep =
+    CdStep_LoadInit) ends 3 frames later with the chunk (ok) or a buffer
+    that fails the check (bad), or never (stall: CdStep_5 waiting); the
+    readers' MOD_TEXT_CD_STOP ends it at once. g_IsUsingCd follows g_CdStep
+    one frame late (UpdateCd copies it first)."""
+
+    def __init__(self, outcomes):
+        self.outcomes, self.step, self.using, self.left, self.got = list(outcomes), 0, 0, 0, None
+        self.reads = 0
+
+    def start(self):
+        assert self.step == 0 and not self.using, "a read started while the CD is busy"
+        self.reads += 1
+        self.got = self.outcomes.pop(0) if self.outcomes else "ok"
+        self.step, self.left = 1, 3
+
+    def stop(self):
+        self.step = 0
+
+    def frame(self):  # UpdateCd, after the reader
+        self.using = self.step
+        if self.step and self.got != "stall":
+            self.left -= 1
+            if not self.left:
+                self.step = 0
+
+
+def sel_reader(n, outcomes, gate_frames, W, T, trace=None):
+    """sel_text_cd.c ModTextReady, line by line; returns (result, chunks
+    applied, frames, reads)"""
+    cd = Cd(outcomes)
+    v = dict(cd=0, ovl=0, t0=0, tr=0, nxt=0, gate=0, fail=0)
+    tag, applied, now = 0, 0, 1000
+    for frame in range(100000):
+        now += 1
+        snd = frame < gate_frames  # an XA command queued / running
+        r = 0
+        c = v["cd"] - 1
+        if tag == "RT":
+            r = 1
+        elif cd.step or cd.using:
+            if c >= 0 and now - v["t0"] > W:
+                cd.stop()
+                v["cd"] = 0
+                v["tr"] += 1
+                if v["tr"] >= T:
+                    v["fail"] = 2
+        elif v["fail"]:
+            tag, r = "dub", 1
+        else:
+            go = True
+            if c >= 0:
+                v["cd"] = 0
+                if cd.got == "bad":
+                    v["fail"] = 1
+                    tag, r, go = "dub", 1, False
+                else:
+                    assert applied == c, "chunk %d applied after %d" % (c, applied)
+                    applied += 1
+                    c += 1
+                    if c >= n:
+                        tag, r, go = "RT", 1, False
+                    else:
+                        v["nxt"], v["tr"] = c, 0
+            if go:
+                if snd:
+                    v["gate"] += 1
+                if snd and v["gate"] < W:
+                    pass
+                else:
+                    c = v["nxt"]
+                    if not c:
+                        tag = 0
+                    cd.start()
+                    v["cd"], v["t0"] = c + 1, now
+        if r:
+            return tag, applied, frame, cd.reads
+        cd.frame()
+    return None, applied, frame, cd.reads
+
+
+def sysopt_reader(n_rt, n_sel, outcomes, W, from_tag="dub"):
+    """sysopt.c SysOptText with Script switched to Retrans (from a dub, or
+    from a half-applied state); returns (final tag, passes as
+    [(pack, chunks applied)], reads)"""
+    cd = Cd(outcomes)
+    load = pack = nxt = ovl = fails = t0 = 0
+    tag = from_tag
+    passes = []
+    now = 1000
+    for frame in range(100000):
+        now += 1
+        if load:
+            if cd.step or cd.using:
+                if now - t0 > W:
+                    cd.stop()
+                    load = 0
+                    fails += 1
+                cd.frame()
+                continue
+            c = load - 1
+            load = 0
+            if cd.got == "bad":
+                fails += 1
+                cd.frame()
+                continue
+            passes[-1][1] += 1
+            n = n_rt if pack == "RT" else n_sel
+            if c + 1 < n:
+                c += 1
+            elif nxt:
+                pack, nxt, c = nxt, 0, 0
+                passes.append([pack, 0])
+            else:
+                tag = pack
+                cd.frame()
+                continue
+        else:
+            want = "RT"
+            if fails >= 2:
+                want = "dub"
+            if tag == want or fails >= 4 or cd.step or cd.using:
+                if tag == want or fails >= 4:
+                    return tag, passes, cd.reads, fails
+                cd.frame()
+                continue
+            pack, nxt = want, 0
+            if want != "RT" and tag != "dub":
+                pack, nxt = "restore", "dub"
+            tag = 0
+            c = 0
+            passes.append([pack, 0])
+        cd.start()
+        load, t0 = c + 1, now
+        cd.frame()
+    return None, passes, cd.reads, fails
+
+
+def cd_reader_check(d, syms, sel_syms, chunks, rt_chunks, rt_packs, dra, dub):
+    h = text_pack_h_defines()
+    W, T = h["MOD_TEXT_CD_WAIT"], h["MOD_TEXT_CD_TRIES"]
+    # DRA's CD sound command state, which SEL reads at fixed addresses
+    src = open(os.path.join(ROOT, "mods/sotn-ultimate/include/game_mod.h")).read()
+    for macro, sym in (("MOD_CD_SND_QUEUE_POS", "g_CdSoundCommandQueuePos"), ("MOD_CD_SND_BUSY", "D_801390A0")):
+        a = int(re.search(r"#define %s \(\*\(volatile \w+\*\)(0x[0-9A-Fa-f]+)\)" % macro, src)[1], 16)
+        if syms.get(sym) != a:
+            fail("game_mod.h %s 0x%X, dra.elf %s 0x%X" % (macro, a, sym, syms.get(sym, 0)))
+    # where SEL's reader runs: its area after the staff roll, before the
+    # first chunk, and the code SEL calls in it
+    area = sel_syms.get("g_ModTextCdArea")
+    fn = sel_syms.get("ModTextReady")
+    if area is None or fn is None:
+        fail("SEL has no g_ModTextCdArea / ModTextReady (src/st/sel/mod_text_cd.inc)")
+    else:
+        end = area + d["MOD_TEXT_CD_AREA"]
+        used = max(v for k, v in sel_syms.items() if area <= v < end) + 4 - area
+        if not (fn == area and end <= tp.SEL_BASE + d["SECTOR"] * 0x800):
+            fail("SEL's reader at 0x%X-0x%X, the first chunk at 0x%X" % (area, end, tp.SEL_BASE + d["SECTOR"] * 0x800))
+        else:
+            print("OK   text packs: SEL's reader (ModTextReady + state) at 0x%X, %d of %d B, before the "
+                  "first chunk at 0x%X" % (area, used, d["MOD_TEXT_CD_AREA"], tp.SEL_BASE + d["SECTOR"] * 0x800))
+    # SEL: every pattern of reads per chunk (0..T-1 stalls then ok / bad,
+    # or T stalls), XA commands busy for 0 / 30 / for ever
+    n = max(len(rt_chunks), 1)
+    pats = []
+
+    def walk(k, seq):
+        if k == n:
+            pats.append(seq)
+            return
+        for st in range(T):
+            walk(k + 1, seq + ["stall"] * st + ["ok"])
+            pats.append(seq + ["stall"] * st + ["bad"])
+        pats.append(seq + ["stall"] * T)
+    walk(0, [])
+    worst = 0
+    errs = []
+    cases = set()
+    for g in (0, 30, 10 ** 6):
+        for p in pats:
+            res, k, frames, reads = sel_reader(n, p, g, W, T)
+            if res is None:
+                errs.append("SEL's reader never returns 1 (%s, XA busy %d)" % (p, g))
+                continue
+            ok_all = k == n
+            if ok_all != (res == "RT") or (res == "dub" and k >= n):
+                errs.append("SEL's reader: %s after %d chunk(s) (%s)" % (res, k, p))
+            if reads > n * T:
+                errs.append("SEL's reader: %d reads for %d chunks" % (reads, n))
+            cases.add((res, k))
+            worst = max(worst, frames)
+    # sysopt: up to 4 failed reads anywhere (bad or stall), the rest ok
+    n_sel = max(len(chunks), 1)
+    soutc = set()
+    seqs = [[]]
+    for _ in range(4):
+        seqs += [s + ["ok"] * i + [f] for s in seqs for i in range(max(n, n_sel) + 1)
+                 for f in ("bad", "stall")]
+        seqs = [list(x) for x in {tuple(s) for s in seqs}]
+    for from_tag in ("dub", 0):
+        for sq in seqs:
+            tag, passes, reads, fails = sysopt_reader(n, n_sel, sq, W, from_tag)
+            if tag is None:
+                errs.append("sysopt's reader never ends (%s)" % sq)
+                continue
+            if tag not in ("RT", "dub") and fails < 4:
+                errs.append("sysopt's reader ends with tag %s after %d fails" % (tag, fails))
+            if tag == "RT" and fails >= 2:
+                errs.append("sysopt's reader: RT applied after giving it up")
+            soutc.add((from_tag, tag, tuple((p, k) for p, k in passes)))
+    # the RAM of every way they end: the dub fallbacks are restore + dub
+    # after any cut, which rt_proof covers chunk by chunk; here every pass
+    # chain sysopt can run, on the real packs
+    ram_runs = 0
+    if rt_packs:
+        for pk in (0, 1):
+            ref = Game(dra, dub, chunks, rt_chunks, d)
+            ref.default(pk)
+            want = ref.state()
+            rt = Game(dra, dub, chunks, rt_chunks, d)
+            rt.default(pk)
+            rt.retrans()
+            rt_state = rt.state()
+            for res, k in sorted(cases, key=str):
+                g = Game(dra, dub, chunks, rt_chunks, d)
+                g.default(pk)
+                g.retrans(upto=k)
+                if res == "dub":
+                    g.default(pk)
+                ram_runs += 1
+                if g.state() != (rt_state if res == "RT" else want):
+                    errs.append("SEL: %s after %d RT chunk(s): RAM not the %s state" % (res, k, res))
+            for from_tag, tag, passes in sorted(soutc, key=str):
+                g = Game(dra, dub, chunks, rt_chunks, d)
+                g.default(pk)
+                if from_tag == 0:  # (an RT pass cut after its first chunk)
+                    run_pack(g.ram, rt_chunks, tp.PACK_RT, d, 1)
+                for p, k in passes:
+                    full = k >= (n if p == "RT" else n_sel)
+                    if p == "RT":
+                        g.tag = 0
+                        run_pack(g.ram, rt_chunks, tp.PACK_RT, d, None if full else k)
+                    elif p == "restore":
+                        g.tag = 0
+                        run_pack(g.ram, chunks, tp.PACK_RESTORE, d, None if full else k)
+                    else:
+                        run_pack(g.ram, chunks, pk, d, None if full else k)
+                ram_runs += 1
+                if tag == "RT" and g.state() != rt_state or tag == "dub" and g.state() != want:
+                    errs.append("sysopt: passes %s end in %s, RAM not that state" % (passes, tag))
+    for e in errs[:8]:
+        fail(e)
+    if not errs:
+        print("OK   text packs: CD readers: SEL %d read patterns x XA busy 0/30/never (stalls, bad chunks, "
+              "%d tries of %d vblanks) all return within %d frames with RT or the dub's text; sysopt %d "
+              "fail patterns end RT / dub / given up after 4; %d end states' RAM checked; SEL reads "
+              "g_CdSoundCommandQueuePos 0x%X, D_801390A0 0x%X" % (len(pats), T, W, worst, len(seqs),
+                                                                 ram_runs, syms["g_CdSoundCommandQueuePos"],
+                                                                 syms["D_801390A0"]))
 
 
 if __name__ == "__main__":

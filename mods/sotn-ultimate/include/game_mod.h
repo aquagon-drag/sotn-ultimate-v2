@@ -396,6 +396,16 @@ typedef struct {
 // DRA's dead VSync-effect buffers (4 KB, src/dra/47BB8.c), at a fixed address
 // (SEL, sysopt and save_mgr.h use it; check_psp_dub.py checks it)
 #define MOD_DUB_STATE ((ModDubState*)0x8013644C)
+// DRA's CD sound command state (src/dra/sound.c; BSS, which MOD_DRA_PAD
+// keeps at its retail addresses), for SEL's text pack reader (sel_text_cd.c):
+// no XA command queued (g_CdSoundCommandQueuePos) or running (D_801390A0)
+// when it starts a read. check_text_packs.py checks them against dra.elf
+#define MOD_CD_SND_QUEUE_POS (*(volatile s16*)0x801396F4)
+#define MOD_CD_SND_BUSY (*(volatile u8*)0x801390A0)
+// SEL's text pack reader (src/st/sel/mod_text_cd.inc) in its dead config
+// copy, right after the PSP staff roll (MOD_CREDITS_PSP_AREA); the text
+// packs start at file offset 0x3000 (MOD_TEXT_BLOB_FIRST)
+#define MOD_TEXT_CD_AREA 0x400
 // Script = Retrans: the retranslation's 12 px proportional font for the text
 // DRA draws with the BIOS font (src/dra/menu.c func_800F99B8: descriptions,
 // help lines, relic and spell names, save messages). Its code
