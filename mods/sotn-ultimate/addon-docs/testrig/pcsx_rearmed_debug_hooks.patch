@@ -1,0 +1,80 @@
+diff --git a/frontend/libretro-version-script b/frontend/libretro-version-script
+index b0c262d..59c9c2c 100644
+--- a/frontend/libretro-version-script
++++ b/frontend/libretro-version-script
+@@ -1,5 +1,4 @@
+ {
+-   global: retro_*;
++   global: retro_*; dbg_*; psxRegs; cdr;
+    local: *;
+ };
+-
+diff --git a/libpcsxcore/cdrom.c b/libpcsxcore/cdrom.c
+index 11c435f..f9f871d 100644
+--- a/libpcsxcore/cdrom.c
++++ b/libpcsxcore/cdrom.c
+@@ -1475,6 +1475,8 @@ unsigned char cdrRead1(void) {
+ 	return psxHu8(0x1801);
+ }
+ 
++unsigned int dbg_cd_n = 0, dbg_frame = 0;
++unsigned int dbg_cd_log[8192][8];
+ void cdrWrite1(unsigned char rt) {
+ 	const char *rnames[] = { "0.cmd", "1.smd", "2.smc", "3.arr" }; (void)rnames;
+ 	CDR_LOG_IO("cdr w1.%s: %02x\n", rnames[cdr.Ctrl & 3], rt);
+@@ -1501,6 +1503,10 @@ void cdrWrite1(unsigned char rt) {
+ 	SysPrintf(" @%08x\n", psxRegs.pc);
+ #endif
+ 
++	{ unsigned int *e = dbg_cd_log[dbg_cd_n & 8191]; int i_;
++	  e[0] = rt; e[1] = cdr.ParamC; e[2] = 0;
++	  for (i_ = 0; i_ < 4 && i_ < cdr.ParamC; i_++) e[2] |= (unsigned)cdr.Param[i_] << (8*i_);
++	  e[3] = psxRegs.pc; e[4] = psxRegs.GPR.n.ra; e[5] = psxRegs.cycle; e[6] = dbg_frame; e[7] = cdr.CmdInProgress; dbg_cd_n++; }
+ 	cdr.ResultReady = 0;
+ 	cdr.Ctrl |= 0x80;
+ 
+diff --git a/libpcsxcore/psxmem.c b/libpcsxcore/psxmem.c
+index a18e159..bedd467 100644
+--- a/libpcsxcore/psxmem.c
++++ b/libpcsxcore/psxmem.c
+@@ -404,9 +404,24 @@ u32 psxMemRead32(psxRegisters *regs, u32 mem) {
+ 	return 0xFFFFFFFF;
+ }
+ 
++
++/* --- debug watch (added) --- */
++unsigned int dbg_watch_lo = 0, dbg_watch_hi = 0;
++unsigned int dbg_watch_n = 0;
++unsigned int dbg_watch_log[4096][6];
++static inline void dbg_watch(psxRegisters *regs, u32 mem, u32 value, u32 size) {
++	u32 a = mem & 0x1fffff;
++	if (a + size > dbg_watch_lo && a < dbg_watch_hi) {
++		unsigned int *e = dbg_watch_log[dbg_watch_n & 4095];
++		e[0] = regs->pc; e[1] = mem; e[2] = value; e[3] = size;
++		e[4] = regs->GPR.n.ra; e[5] = regs->cycle;
++		dbg_watch_n++;
++	}
++}
+ void psxMemWrite8(psxRegisters *regs, u32 mem, u32 value) {
+ 	u8 *p;
+ 	u32 t;
++	dbg_watch(regs, mem, value, 1);
+ 
+ 	if (likely(psxm_(&p, regs, mem, 1))) {
+ 		*p = value;
+@@ -430,6 +445,7 @@ void psxMemWrite8(psxRegisters *regs, u32 mem, u32 value) {
+ void psxMemWrite16(psxRegisters *regs, u32 mem, u32 value) {
+ 	u8 *p;
+ 	u32 t;
++	dbg_watch(regs, mem, value, 2);
+ 
+ 	if (likely(psxm_(&p, regs, mem, 1))) {
+ 		*(u16 *)p = SWAPu16(value);
+@@ -453,6 +469,7 @@ void psxMemWrite16(psxRegisters *regs, u32 mem, u32 value) {
+ void psxMemWrite32(psxRegisters *regs, u32 mem, u32 value) {
+ 	u8 *p;
+ 	u32 t;
++	dbg_watch(regs, mem, value, 4);
+ 
+ 	if (likely(psxm_(&p, regs, mem, 1))) {
+ 		*(u32 *)p = SWAPu32(value);
