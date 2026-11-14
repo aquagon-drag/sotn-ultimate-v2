@@ -27,6 +27,8 @@ US = os.path.join(ROOT, "disks/us/BIN/F_GAME.BIN")
 OUT = os.path.join(ROOT, "build/us/F_GAME.BIN")
 OUT2 = os.path.join(ROOT, "build/us/F_GAME2.BIN")
 PAGE = text_rt.FONT8_PAGE
+CLUTS = 0x40000  # 256 CLUTs of 16 colours (VRAM CLUT 0x100 + n)
+FLAT_CLUTS = (0x5D, 0x5E)
 
 
 def tile(page, t):
@@ -64,6 +66,16 @@ def main():
         rows = tile(us_page, c) if t is None else tile(jp_page, t)
         for buf in (us, f2):
             put(buf, text_rt.RT8_TILE0 + c, rows)
+    # the patch's glyphs have a shadow (colour 1; the body is colour 6, as
+    # the US glyphs). The menu's one-colour CLUTs for dimmed and marked text
+    # (menu.c MenuDrawImg: 0x15D red, 0x15E black = the files' CLUTs 0x5D /
+    # 0x5E) would paint it like the body, a blot: their colour 1 becomes
+    # transparent (the US glyphs have no colour 1)
+    for buf in (us, f2):
+        for clut in FLAT_CLUTS:
+            o = CLUTS + clut * 32 + 2
+            assert buf[o:o + 2] == buf[o + 2:o + 4], "CLUT 0x%X is not one colour" % clut
+            buf[o:o + 2] = b"\0\0"
     open(OUT, "wb").write(us)
     open(OUT2, "wb").write(f2)
     n = sum(1 for t, _ in tab if t is not None)
