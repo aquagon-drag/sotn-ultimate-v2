@@ -53,6 +53,11 @@ LBA_BEFORE=$(sha1sum include/lba_us.h 2>/dev/null || true)
 (cd mods/sotn-ultimate/tools && python3 text_packs.py --header)
 mkdir -p build/us
 [ -f build/us/TXT_RT.BIN ] || head -c 2048 /dev/zero > build/us/TXT_RT.BIN
+# SD/TXT_PAD.BIN: 640 zero sectors after it (README section 5). The drive
+# reads ahead of a finished 4-sector CdFile_DemoKey read until the game's
+# CdlPause arrives; with the pack last on the disc it hit the lead-out first
+# and the loader hung. check_cd_lba.py asserts the runway.
+[ "$(stat -c %s build/us/TXT_PAD.BIN 2>/dev/null)" = 1310720 ] || head -c 1310720 /dev/zero > build/us/TXT_PAD.BIN
 # SEL's RT pack reader runs from its dead config copy: src/st/sel/
 # mod_text_cd.inc must be sel_text_cd.c's cc1 output (gen_sel_text_cd.sh)
 bash mods/sotn-ultimate/tools/gen_sel_text_cd.sh --check

@@ -375,7 +375,7 @@ typedef struct {
     ((ST_SEL_BIN_OFF + MOD_TEXT_SECTOR - MOD_TEXT_DEMOKEY_LBA) / 4)
 #define MOD_TEXT_SEL_CHUNK(c)                                                  \
     ((const u8*)(0x80180000 + (MOD_TEXT_SECTOR + 4 * (c)) * 0x800))
-// The RT pack's chunks: SD/TXT_RT.BIN, the last file on the disc (no other
+// The RT pack's chunks: SD/TXT_RT.BIN, after the last original file (no other
 // file moves), read by the same CdFile_DemoKey entry: chunk 0 at its first
 // sector whose distance to DEMOKEY is a multiple of 4 (text_packs.py
 // rt_layout), each chunk in 4 whole sectors. SEL reads it at the start of an

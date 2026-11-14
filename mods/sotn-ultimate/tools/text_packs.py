@@ -56,7 +56,7 @@ SEL_BASE = 0x80180000
 DEAD_START, DEAD_END = 0x25FC + 0x5A0, 0x25FC + 0x7F10
 PACK_NAMES = {0: "PS1", 1: "PSP", 2: "RT", 3: "restore"}
 PACK_RT, PACK_RESTORE = 2, 3
-# the retranslation pack's chunks: SD/TXT_RT.BIN, the last file on the disc
+# the retranslation pack's chunks: SD/TXT_RT.BIN, before the padding file SD/TXT_PAD.BIN
 RT_FILE = os.path.join(BUILD, "TXT_RT.BIN")
 RT_HEADER = os.path.join(ROOT, "mods/sotn-ultimate/include/mod_text_rt.h")
 

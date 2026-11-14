@@ -528,10 +528,16 @@ before `XA`:
 The new stages use the four unused `TE1`-`TE4` stage slots, so they need no
 new files (section 7).
 
-One more file goes after everything else, as the disc's last file:
-`SD/TXT_RT.BIN`, the retranslation's text pack (`text_packs.py --apply`; one
-empty sector without `disks/jpre`). Being last, it moves no other file;
-`SD` had room for its directory record.
+Two more files go after everything else: `SD/TXT_RT.BIN`, the
+retranslation's text pack (`text_packs.py --apply`; one empty sector without
+`disks/jpre`), and the disc's last file, `SD/TXT_PAD.BIN`, 640 zero sectors
+(`build_disc.sh`). Being last, they move no other file; `SD` had room for
+their directory records. The padding is a runway: after a finished
+`CdFile_DemoKey` read the drive keeps reading ahead until the game's
+`CdlPause` is accepted, and with the pack at the very end it reached the
+lead-out first, after which the loader waits forever. `check_cd_lba.py`
+asserts that 600+ MODE2 form 1 data sectors follow the last chunk of every
+file read that way (SEL, the RT pack) and that nothing else sits near the end.
 
 Why the files go there: the literal sector numbers in `src/dra/cd.c` and SEL
 stay right only while every file before them keeps its place

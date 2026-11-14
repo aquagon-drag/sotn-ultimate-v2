@@ -120,8 +120,45 @@ if len(offs) != len(movies):
 for i, (x, path) in enumerate(zip(offs, movies)):
     want(f"stream_info.c movie {i}", x, path)
 
+# Runway after every file the game reads through DRA's CdFile_DemoKey path
+# (SEL's text chunks, the RT pack's chunks): the drive keeps reading ahead of
+# a finished 4-sector read until CdlPause is accepted, and at the lead-out it
+# stops for good (the loader then hangs). So at least RUNWAY ordinary data
+# sectors (sync, MODE2 form 1) must follow each such file's last sector, and
+# nothing but the padding file may sit that close to the end of the image.
+RUNWAY = 600
+f.seek(0, 2)
+total = f.tell() // 2352
+n += 1
+for path in ("ST/SEL/SEL.BIN", "SD/TXT_RT.BIN"):
+    if path not in files:
+        fails.append(f"runway: {path} is not on the disc")
+        continue
+    elba, esz = files[path]
+    end = elba + (esz + 2047) // 2048
+    # the last 4-sector read may run past the file's end by up to 3 sectors
+    end += -(end - files["BIN/DEMOKEY.BIN"][0]) % 4
+    if total - end < RUNWAY:
+        fails.append(f"runway: only {total - end} sectors follow the last chunk of {path} "
+                     f"(read through CdFile_DemoKey), need {RUNWAY}")
+        continue
+    for s in range(end, end + RUNWAY):
+        f.seek(s * 2352)
+        h = f.read(24)
+        if h[:12] != b"\x00" + b"\xff" * 10 + b"\x00" or h[18] & 0x20 or not h[18] & 0x08:
+            fails.append(f"runway: sector {s} after {path} is not a MODE2 form 1 data sector")
+            break
+last = max(files.items(), key=lambda kv: kv[1][0] + (kv[1][1] + 2047) // 2048)[0]
+for path, (elba, esz) in files.items():
+    if (elba + (esz + 2047) // 2048 + RUNWAY > total and path != "SD/TXT_PAD.BIN"
+            and not path.endswith("TXT_RT.BIN")):
+        fails.append(f"runway: {path} ends within {RUNWAY} sectors of the image end")
+if last != "SD/TXT_PAD.BIN":
+    fails.append(f"runway: the last file on the disc is {last}, expected SD/TXT_PAD.BIN")
+
 if fails:
     for s in fails:
         print("FAIL cd lba:", s)
     sys.exit(1)
-print(f"OK   cd lba: {n} literal sectors / lengths in cd.c and SEL match the disc")
+print(f"OK   cd lba: {n} literal sectors / lengths in cd.c and SEL match the disc; "
+      f"{RUNWAY}+ data sectors follow every CdFile_DemoKey-read file")
