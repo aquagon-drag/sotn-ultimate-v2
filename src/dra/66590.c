@@ -488,7 +488,21 @@ u16* func_80106A28(u16 ch, u16 kind) {
         break;
     }
     if (kind == 3) {
-        for (i = 0; i < 0x42; i++) {
+#if defined(MOD_SATURN)
+        // Retail bug, fixed: the outline pass ran over 0x42 words of the
+        // 0x30-word glyph buffer, i.e. over cd.c's g_CdCallback, g_CdLoc and
+        // g_Cd, which follow it in BSS. Only SEL draws with kind 3 (its
+        // file-select text, every frame), and retail never has a file load
+        // in flight there. SEL's read of the retranslation's text pack
+        // (ModTextReady) does: between CdStep_SetPos and CdStep_Seek the pass
+        // turned g_CdCallback 4 into 0x14 (g_CdCallbacks[20]: no data
+        // callback, so the read never ended) and the sector 0x40 into 0x41.
+        // Same code size: two immediates.
+#define GLYPH_OUTLINE_WORDS 0x30
+#else
+#define GLYPH_OUTLINE_WORDS 0x42
+#endif
+        for (i = 0; i < GLYPH_OUTLINE_WORDS; i++) {
             dest2 = D_80137EF8[i];
             if (dest2 & 4) {
                 if ((D_80137EF8[i] & 0xF0) == 0) {
@@ -505,7 +519,7 @@ u16* func_80106A28(u16 ch, u16 kind) {
                     D_80137EF8[i] |= 0x1000;
                 }
             }
-            if ((dest2 & 0x4000) && (i < 0x41)) {
+            if ((dest2 & 0x4000) && (i < GLYPH_OUTLINE_WORDS - 1)) {
                 if ((D_80137EF8[i + 1] & 0xF) == 0) {
                     D_80137EF8[i + 1] |= 1;
                 }
