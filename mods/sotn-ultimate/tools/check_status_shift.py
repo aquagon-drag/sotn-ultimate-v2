@@ -22,6 +22,9 @@ MODDED_WEAPONS = (0, 1, 4, 5, 14, 17, 21, 31, 33)
 INTENDED = {"DRA.BIN", "TOP.BIN", "SEL.BIN", "NO4.BIN", "BO3.BIN", "NZ1.BIN", "CAT.BIN", "NP3.BIN", "NO3.BIN", "NO0.BIN", "F_NP3.BIN", "F_NO3.BIN", "WRP.BIN", "F_WRP.BIN", "RNO3.BIN", "F_RNO3.BIN", "RWRP.BIN", "F_RWRP.BIN", "RNO4.BIN", "RNO0.BIN", "NO2.BIN", "ARE.BIN", "TT_005.BIN"}  # changed by the mod beyond offsets
 # Richter: the JP v1.2 flame whip fix (src/ric/pl_whip.c)
 INTENDED |= {"RIC.BIN"}
+# the stages' shared text code over the debug font (step 6b,
+# mods/sotn-ultimate/src/menu/main_text.c)
+INTENDED |= {"main.exe"}
 # the stages whose red / sealed doors also open while Alucard sprints
 # (MOD_SPRINTING in include/game.h): code only, data checked by
 # check_stage_data.py
