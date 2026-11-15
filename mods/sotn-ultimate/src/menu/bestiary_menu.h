@@ -137,6 +137,16 @@ void ModBestInput(s32* nav, u8 nOptions, u32 type) {
     }
 }
 
+// cell e: 0 blank, 1 not defeated yet, 2 defeated
+static s32 BestSeen(s32 e) {
+    s32 bit = g_ModLibBit[e];
+
+    if (g_ModLibEnemy[bit] == 0xFFFF) {
+        return 0;
+    }
+    return (g_CastleFlags[(bit >> 3) + ENEMY_LIST_190] >> (bit & 7) & 1) + 1;
+}
+
 static void BestInput(void) {
     s32 cur = g_BestCur;
     u16 rep = g_pads[0].repeat;
@@ -154,9 +164,7 @@ static void BestInput(void) {
         return;
     }
     if (g_pads[0].tapped & PAD_CROSS) {
-        row = g_ModLibBit[cur];
-        if (g_ModLibEnemy[row] != 0xFFFF &&
-            (g_CastleFlags[(row >> 3) + ENEMY_LIST_190] & (1 << (row & 7)))) {
+        if (BestSeen(cur) == 2) {
             g_api.PlaySfx(SFX_UI_CONFIRM);
             g_BestPage = 1;
             g_BestLd = 1;
@@ -407,10 +415,7 @@ static void BestPage(MenuContext* ctx) {
             }
             i = g_pads[0].repeat & PAD_RIGHT ? 1 : g_pads[0].repeat & PAD_LEFT ? -1 : 0;
             for (e += i; i && e >= 0 && e < BEST_CELLS; e += i) {
-                bit = g_ModLibBit[e];
-                if (g_ModLibEnemy[bit] != 0xFFFF &&
-                    (g_CastleFlags[(bit >> 3) + ENEMY_LIST_190] &
-                     (1 << (bit & 7)))) {
+                if (BestSeen(e) == 2) {
                     g_api.PlaySfx(SFX_UI_MOVE);
                     g_BestCur = e;
                     g_BestLd = 1;
@@ -418,7 +423,6 @@ static void BestPage(MenuContext* ctx) {
                 }
             }
             e = g_BestCur;
-            bit = LIB_BIT(e);
         }
     }
     MenuDrawStr(def->name, 24, 36, ctx);
@@ -467,7 +471,6 @@ static void BestPage(MenuContext* ctx) {
 
 void ModBestDraw(MenuContext* ctx) {
     s32 i, e, x, y, bit, r;
-    u16 enemy;
 
     if (g_MenuStep != MOD_STEP_BEST) {
         if (g_MenuStep == MENU_STEP_FAMILIAR_INIT ||
@@ -497,16 +500,13 @@ void ModBestDraw(MenuContext* ctx) {
         }
         x = BEST_X0 + (i & 1) * BEST_DX;
         y = BEST_Y0 + (i / 2) * BEST_DY;
-        bit = g_ModLibBit[e];
-        enemy = g_ModLibEnemy[bit];
-        if (enemy == 0xFFFF) {
+        bit = BestSeen(e);
+        if (!bit) {
             continue;
         }
-        if (g_CastleFlags[(bit >> 3) + ENEMY_LIST_190] & (1 << (bit & 7))) {
-            MenuDrawStr(g_api.enemyDefs[enemy].name, x, y, ctx);
-        } else {
-            MenuDrawStr(g_BestNone, x, y, ctx);
-        }
+        MenuDrawStr(bit == 2 ? g_api.enemyDefs[g_ModLibEnemy[g_ModLibBit[e]]].name
+                             : g_BestNone,
+                    x, y, ctx);
         if (e == g_BestCur) {
             r = g_Timer & 0x20 ? 0x40 + (g_Timer & 0x1F)
                                : 0x5F - (g_Timer & 0x1F);
