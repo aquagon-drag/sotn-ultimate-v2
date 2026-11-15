@@ -1121,6 +1121,58 @@ def write_lib_header():
     return old != text
 
 
+# --- the file select's area names (Script = Retrans saves, step 6b) --------
+# the patched SEL.BIN's table of 80 ENC12 names by stage id (0x22B8), split
+# into the US screen's two 8x8 lines (at most SEL_PLACE_CHARS each: the US
+# names reach 12, "Black Marble" / "Death Wing's"); a stage the patch has no
+# name for (the Saturn areas) keeps the US one
+JP_SEL = os.path.join(INPUT_DIR, "ST", "SEL", "SEL.BIN")
+JP_SEL_SHA1 = "73ab8545ff84cb823ebe866aff0959fd1a7089f6"
+SEL_PLACE_TAB, SEL_PLACE_CHARS, SEL_PLACES_LEN = 0x22B8, 12, 0x300
+SEL_PLACES_MAGIC = b"PLRT"
+
+
+def sel_places():
+    """{stage: (line 1, line 2)} or None (no retranslation input)"""
+    ok, msg = inputs_state()
+    if not ok or not os.path.exists(JP_SEL):
+        return None
+    if sha1(JP_SEL) != JP_SEL_SHA1:
+        sys.exit("text_rt: %s is not the patched disc's ST/SEL/SEL.BIN (SHA-1 %s)" % (JP_SEL, JP_SEL_SHA1))
+    jp = Jp(open(JP_DRA, "rb").read())
+    sel = open(JP_SEL, "rb").read()
+    out = {}
+    for st in range(80):
+        name = lib_enc12(jp, sel, struct.unpack_from("<I", sel, SEL_PLACE_TAB + 4 * st)[0]).strip()
+        name = PLAIN.get(name, name)
+        if not name:
+            continue
+        if len(name) <= SEL_PLACE_CHARS:
+            out[st] = (name, "")
+            continue
+        words = name.split(" ")
+        cuts = [(" ".join(words[:k]), " ".join(words[k:])) for k in range(len(words) - 1, 0, -1)]
+        cuts = [c for c in cuts if len(c[0]) <= SEL_PLACE_CHARS and len(c[1]) <= SEL_PLACE_CHARS]
+        assert cuts, "file select name does not fit two lines: %r" % name
+        out[st] = cuts[0]
+    return out
+
+
+def sel_places_blob():
+    """MOD_SEL_RT_PLACES's bytes (include/game_mod.h), or b"" """
+    places = sel_places()
+    if not places:
+        return b""
+    head = bytearray(SEL_PLACES_MAGIC + bytes(160))
+    body = bytearray()
+    for st, (a, b) in sorted(places.items()):
+        struct.pack_into("<H", head, 4 + 2 * st, len(head) + len(body))
+        body += to_s(a) + b"\xff\x00" + to_s(b) + b"\xff\x00"
+    blob = bytes(head + body)
+    assert len(blob) <= SEL_PLACES_LEN, len(blob)
+    return blob
+
+
 def main():
     import text_packs as tp
     syms = tp.dra_symbols()
@@ -1143,6 +1195,10 @@ def main():
         text_rt_report.write(path, res)
         lines = []
         lib_rt(lines)
+        places = sel_places() or {}
+        lines += ["", "## File select area names (Script = Retrans saves)", "",
+                  "| Stage | Line 1 | Line 2 |", "|---|---|---|"]
+        lines += ["| 0x%02X | %s | %s |" % (st, a, b) for st, (a, b) in sorted(places.items())]
         open(path, "a", encoding="utf-8").write("\n".join(lines) + "\n")
 
 

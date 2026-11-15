@@ -95,6 +95,11 @@ void HydrateSaveSummaryEntry(s32 port, s32 slot, s32 slotValue) {
             g_SaveSummary[port].stage[slot] = mg[-20 + 17] & 0x7F;
         }
     }
+    // made with Script = Retrans: its area name in the retranslation
+    // (PrintFileSelectPlaceName)
+    if (save->info.name[9] & MOD_FLAG2_SCRIPT_RETRANS) {
+        g_SaveSummary[port].stage[slot] |= MOD_SEL_STAGE_RT;
+    }
 #endif
     g_SaveSummary[port].roomX[slot] = save->info.roomX;
     g_SaveSummary[port].roomY[slot] = save->info.roomY;

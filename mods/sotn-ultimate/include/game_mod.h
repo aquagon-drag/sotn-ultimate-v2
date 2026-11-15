@@ -365,6 +365,17 @@ typedef struct {
 // 4 * g_LoadOvlIdx, so g_LoadOvlIdx = MOD_TEXT_CD_IDX + chunk and no CdFile
 // changes. SEL reads them in its own RAM (MOD_TEXT_SEL_CHUNK).
 #define MOD_TEXT_MAGIC 0x4B505854 // "TXPK"
+// The file select's area names in the retranslation (step 6b): the last
+// MOD_SEL_RT_PLACES_LEN bytes of that dead copy (the chunks stop before
+// them), written with the chunks by text_packs.py --apply when the build has
+// the retranslation: magic, u16 offsets by stage id (0: none, the US name),
+// then "line 1" 0xFF 0 "line 2" 0xFF 0 each (_S encoding). A save made with
+// Script = Retrans (MOD_FLAG2_SCRIPT_RETRANS in its info.name[9]) shows them
+// (src/st/sel/32D6C.c marks its summary's stage with MOD_SEL_STAGE_RT).
+#define MOD_SEL_RT_PLACES_LEN 0x300
+#define MOD_SEL_RT_PLACES (0x80180000 + 0x25FC + 0x7F10 - MOD_SEL_RT_PLACES_LEN)
+#define MOD_SEL_RT_PLACES_MAGIC 0x54524C50 // "PLRT"
+#define MOD_SEL_STAGE_RT 0x100
 #define MOD_TEXT_CHUNK_LEN 0x2000
 #define MOD_TEXT_DEMOKEY_LBA 0x7415
 #define MOD_TEXT_BLOB_FIRST 6 // (0x25FC + MOD_CREDITS_PSP_AREA + 0x7FF) / 0x800

@@ -601,6 +601,25 @@ void PrintFileSelectPlaceName(s32 port, s32 slot, s32 y) {
     volatile u32 pad; // !FAKE:
 
     s32 stage = g_SaveSummary[port].stage[slot];
+#if defined(MOD_SATURN)
+    // a save made with Script = Retrans: the retranslation's name when the
+    // build has it (include/game_mod.h MOD_SEL_RT_PLACES)
+    u8* rt = (u8*)MOD_SEL_RT_PLACES;
+    u16 off;
+
+    if (stage & MOD_SEL_STAGE_RT) {
+        stage &= 0xFF;
+        off = ((u16*)(rt + 4))[stage];
+        if (*(u32*)rt == MOD_SEL_RT_PLACES_MAGIC && off) {
+            rt += off;
+            DrawImages8x8(rt, 0xA0, y, 1);
+            while (*rt++ != 0xFF) {
+            }
+            DrawImages8x8(rt + 1, 0xA0, y + 8, 1);
+            return;
+        }
+    }
+#endif
     DrawImages8x8(D_80180128[stage].line1, 0xA0, y, 1);
     DrawImages8x8(D_80180128[stage].line2, 0xA0, y + 8, 1);
 }

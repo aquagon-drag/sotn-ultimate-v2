@@ -54,6 +54,9 @@ SEL_BASE = 0x80180000
 # offsets [0x25FC, 0x25FC + 0x7F10), the first MOD_CREDITS_PSP_AREA bytes of
 # it the staff roll of Ending = PSP (a live table: a reference to it is fine)
 DEAD_START, DEAD_END = 0x25FC + 0x5A0, 0x25FC + 0x7F10
+# its last MOD_SEL_RT_PLACES_LEN bytes: the file select's retranslated area
+# names (include/game_mod.h MOD_SEL_RT_PLACES, text_rt.py sel_places_blob)
+DEAD_CHUNKS_END = DEAD_END - 0x300
 PACK_NAMES = {0: "PS1", 1: "PSP", 2: "RT", 3: "restore"}
 PACK_RT, PACK_RESTORE = 2, 3
 # the retranslation pack's chunks: SD/TXT_RT.BIN, before the padding file SD/TXT_PAD.BIN
@@ -143,7 +146,7 @@ def c_defines():
 def chunk_room(d, c):
     """the bytes chunk c may use: its 4 sectors, cut at the dead copy's end"""
     off = (d["SECTOR"] + 4 * c) * 0x800
-    return max(0, min(d["MOD_TEXT_CHUNK_LEN"], DEAD_END - off))
+    return max(0, min(d["MOD_TEXT_CHUNK_LEN"], DEAD_CHUNKS_END - off))
 
 
 def dra_symbols(elf=None):
@@ -640,11 +643,20 @@ def make(write=False):
         sel = bytearray(open(sel_path, "rb").read())
         for c, blob in enumerate(chunks):
             off = (d["SECTOR"] + 4 * c) * 0x800
-            assert DEAD_START <= off and off + len(blob) <= DEAD_END
+            assert DEAD_START <= off and off + len(blob) <= DEAD_CHUNKS_END
             if sel[off:off + len(blob)] != blob:
                 sel[off:off + len(blob)] = blob
                 changed[:0] = [] if "SEL.BIN" in changed else ["SEL.BIN"]
             edits.append([off, len(blob)])
+        import text_rt
+        places = text_rt.sel_places_blob()
+        if places:
+            off = DEAD_CHUNKS_END
+            assert len(places) <= DEAD_END - off
+            if sel[off:off + len(places)] != places:
+                sel[off:off + len(places)] = places
+                changed[:0] = [] if "SEL.BIN" in changed else ["SEL.BIN"]
+            edits.append([off, len(places)])
         if changed:
             open(sel_path, "wb").write(sel)
         # without the retranslation: one empty sector (the file is on the
