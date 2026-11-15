@@ -141,7 +141,11 @@ for i in range(0, COUNT, 10):
 out += ["#ifdef MOD_OUTER_WALL_GHOST",
         "    0x%03X, 0xFFFF," % GHOST_ID,
         "#endif"]
-out += ["};", "", "// descriptions of bits %d.. (the PS1 ones are D_us_80180FB4)" % RETAIL,
+out += ["};", "",
+        "// (the pause menu's Bestiary, src/menu/bestiary_menu.h, reads the",
+        "// descriptions from LIB.BIN on the disc: not in its code)",
+        "#ifndef MOD_LIB_NO_DESC",
+        "// descriptions of bits %d.. (the PS1 ones are D_us_80180FB4)" % RETAIL,
         "static const char* const g_ModLibDesc[] = {"]
 for x in new_ids:
     out.append('    "%s", // 0x%03X' % (DESC[x], x))
@@ -152,8 +156,9 @@ out += ["};", ""]
 (psp_id, psp_text), = DESC_PSP.items()
 out += ["// the PSP port's description of bit %d (0x%03X), with the PSP / JP dubs" % (
             RETAIL + new_ids.index(psp_id), psp_id),
-        "#define MOD_LIB_DESC_PSP_BIT %d" % (RETAIL + new_ids.index(psp_id)),
-        'static const char g_ModLibDescPsp[] = "%s";' % psp_text, ""]
+        'static const char g_ModLibDescPsp[] = "%s";' % psp_text,
+        "#endif",
+        "#define MOD_LIB_DESC_PSP_BIT %d" % (RETAIL + new_ids.index(psp_id)), ""]
 text = "\n".join(out)
 if not os.path.exists(OUT) or open(OUT, encoding="utf-8").read() != text:
     open(OUT, "w", encoding="utf-8").write(text)

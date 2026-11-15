@@ -67,7 +67,24 @@ if [ "$(stat -c %s $RETAIL)" -gt $OFF ]; then
     echo "FAIL sysopt: $RETAIL ends past MOD_SYSOPT_ADDR"; exit 1
 fi
 
-VERSION=us mipsel-linux-gnu-cpp -Iinclude -Iinclude/psxsdk -Isrc/dra -lang-c \
+# the pause menu Bestiary's description tables in LIB.BIN (bestiary_menu.h
+# reads them from the disc): their addresses in the built stlib.elf
+lib_sym() {
+    mipsel-linux-gnu-nm build/us/stlib.elf | awk -v s="$1" '$3==s{print "0x"$1}' | head -1
+}
+BEST_DEFS=""
+for p in BEST_LIB_DESC:D_us_80180FB4 BEST_LIB_DESC_S:g_ModLibDesc \
+    BEST_LIB_DESC_P:g_ModLibDescPsp BEST_LIB_RT:g_ModLibRtDesc \
+    BEST_LIB_RT_S:g_ModLibRtDescSat; do
+    a=$(lib_sym "${p#*:}")
+    case "${p%%:*}" in BEST_LIB_RT*) a=${a:-0} ;; esac
+    if [ -z "$a" ]; then
+        echo "FAIL sysopt: ${p#*:} not in build/us/stlib.elf"; exit 1
+    fi
+    BEST_DEFS="$BEST_DEFS -D${p%%:*}=${a}u"
+done
+
+VERSION=us mipsel-linux-gnu-cpp $BEST_DEFS -Iinclude -Iinclude/psxsdk -Isrc/dra -lang-c \
     -undef -Wall -fno-builtin -Dmips -D__GNUC__=2 -D__OPTIMIZE__ -D__mips__ -D__mips \
     -Dpsx -D__psx__ -D__psx -D_PSYQ -D__EXTENSIONS__ -D_MIPSEL -D_LANGUAGE_C \
     -DLANGUAGE_C -DNO_LOGS -DHACKS -DUSE_INCLUDE_ASM -D_internal_version_us -DSOTN_STR \
@@ -86,7 +103,8 @@ for s in func_800F5E68 MenuDrawStr MenuHandleCursorInput D_8013784C \
     g_Entities MenuSoundConfigDraw g_Menus g_MenuInit g_LbaSdAlkVh \
     g_LbaSdAlkVb g_CdStep g_IsUsingCd g_LoadFile g_ServantLoaded g_MenuStep     g_LoadOvlIdx g_StageId SsUtAllKeyOff VSync CdInit CdReadyCallback \
     CdDataCallback MenuDrawInt MenuDrawRect func_800F8754 MenuFamiliarsDraw \
-    g_MenuNavigation g_CastleFlags g_Timer g_api; do
+    g_MenuNavigation g_CastleFlags g_Timer g_api MenuDrawImg func_800F99B8 \
+    D_8013794C g_Pix D_801EC000 g_CdCallbacks g_Cd LoadTPage; do
     a=$(mipsel-linux-gnu-nm build/us/dra.elf | awk -v s="$s" '$3==s{print $1}')
     if [ -z "$a" ]; then # (main SDK functions: config/symbols.us.txt)
         a=$(awk -v s="$s" '$1==s{sub(/;/,"",$3); sub(/^0x/,"",$3); print $3}' config/symbols.us.txt)
