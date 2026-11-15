@@ -474,8 +474,38 @@ SATURN_RT = {
     ("acc", 92, "name"): "Song Lyrics Card",
     ("acc", 92, "desc"): "A lyrics card for \"Nocturne\"",
     ("relic", 30, "desc"): "Dash with →→ (direction key twice)",
+    ("enemy", 414, "name"): "Venus Mantrap",
     ("enemy", 420, "name"): "Skeleton Breeder",
     ("enemy", 425, "name"): "Skeleton Guardian",
+}
+
+
+# Script = Retrans: the Librarian's descriptions of the Saturn-only monsters
+# (enemy id -> text), written for this project from the Saturn's Japanese
+# (LIBRARY.PRG; _analysis/saturn_new_monsters_jp.txt on the builder's PC),
+# approved by Gerardo 2026-11-15. Step 6b puts them in the Librarian's RT
+# text (line breaks set there, against the retranslation's detail box).
+# Maria (0x198): Retrans uses this Saturn line with every dub (not the PSP
+# port's text, gen_saturn_bestiary.py DESC_PSP).
+SATURN_BESTIARY_RT = {
+    0x190: "A living terracotta statue, part of the castle's automated security.",
+    0x19F: "A living marble statue, part of the castle's automated security.",
+    0x1A0: "A living granite statue, part of the castle's automated security.",
+    0x191: "A masterpiece of great value as an antique.",
+    0x192: "A wrathful djinn. Quite literally, a man on fire.",
+    0x194: "Chief of the skeleton soldiers, beaten in a power struggle within the castle.",
+    0x195: "The castle's mad gardener. Shows no mercy to those who ravage the garden.",
+    0x196: "Laden with human-faced fruit, it never stops smiling.",
+    0x198: "Vampire hunter searching for word of Richter Belmont.",
+    0x19D: "Charming creature of the waterside. Delicious, with a texture like chicken.",
+    0x19E: "A giant flytrap. It traps people, not flies.",
+    0x1A1: "An incorporeal ghost that only holy weapons can destroy.",
+    0x1A2: "A persecuted soul whose hatred will never fade.",
+    0x1A4: "Skeleton of a tracker who leads Skeleton Beasts.",
+    0x1A5: "A chimera built from the bones of various animals.",
+    0x1A7: "One who controls corpses. The light covering the corpse is its true form.",
+    0x1A8: "A fearsome spirit of the dead. Beware its deadly touch.",
+    0x1A9: "A skeleton with spear and shield, entrusted with guarding key points.",
 }
 
 
