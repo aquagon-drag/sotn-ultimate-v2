@@ -383,7 +383,7 @@ LIMITS = {
     "spell_name": ("px", 240, "Spell screen (func_800F9F40: 288 px line shown by a 240 px "
                    "sprite); also <= 31 bytes (func_800F9DD0 copies 16 pairs)"),
     "desc": ("px", 296, "info bar with the RT pack (ShowText = func_800F99B8: a 0x94-byte line "
-             "from x=64, as the retranslation's patch, game_mod.h MOD_RT_INFO_W; 0x90 = 288 px "
+             "from x=64, as the retranslation's patch, menu.c func_800F5AE4; 0x90 = 288 px "
              "from x=72 otherwise), cut "
              "where it ends)"),
     "menu": ("chars", None, "per string, below (MENU_LIMIT)"),

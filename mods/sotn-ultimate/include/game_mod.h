@@ -425,9 +425,6 @@ typedef struct {
 // glyphs are the font page's tiles from MOD_RT8_TILE0
 // (mods/sotn-ultimate/tools/gen_rt_font8.py). MenuDrawChar's ch with
 // MOD_RT8_FINAL set is a tile ModRt8Char has already chosen
-// Script = Retrans: the info bar's line, bytes a row (296 px; 0x90 = 288 px
-// otherwise): src/dra/menu.c func_800F99B8 / func_800F5AE4
-#define MOD_RT_INFO_W 0x94
 #define MOD_RT8_ADDR 0x8013BF20
 #define MOD_RT8_CHARS 0x60
 #define MOD_RT8_TILE0 0x60

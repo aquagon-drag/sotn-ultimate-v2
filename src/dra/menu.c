@@ -666,11 +666,8 @@ void func_800F5AE4(MenuContext* ctx) {
 
 #if defined(VERSION_US) && defined(MOD_RT_FONT_ADDR)
     // Script = Retrans: the retranslation's info bar (as its patch: text
-    // from x=64, a 296 px line, func_800F99B8's MOD_RT_INFO_W)
-    x = 72;
-    if (*(u8*)&MOD_DUB_STATE->textPack == MOD_TEXT_PACK_RT) {
-        x = 64;
-    }
+    // from x=64, 8 px further left, in a line 8 px wider: func_800F99B8)
+    x = 72 - ((*(u8*)&MOD_DUB_STATE->textPack == MOD_TEXT_PACK_RT) << 3);
     for (i = 0; i < 3; i++, x += 128)
 #else
     for (i = 0, x = 72; i < 3; i++, x += 128)
@@ -2438,13 +2435,12 @@ void func_800F99B8(const char* str, u32 y, bool arg2) {
     if (arg2 == 0) {
         var_s4 = 0x90;
 #if defined(VERSION_US) && defined(MOD_RT_FONT_ADDR)
-        // Script = Retrans: the info bar's line is 296 px, as the
-        // retranslation's patch made it (func_800F5AE4 starts it 8 px
-        // further left); 0x40 more bytes of g_Pix, VRAM x 0x1C8-0x1C9 of
-        // rows 32-47, which no other line uses
-        if (y == 2 && *(u8*)&MOD_DUB_STATE->textPack == MOD_TEXT_PACK_RT) {
-            var_s4 = MOD_RT_INFO_W;
-        }
+        // Script = Retrans: these lines are 296 px (4 bytes a row more), as
+        // the retranslation's patch made them (it widened every line by
+        // 8 px); the info bar starts 8 px further left (func_800F5AE4). The
+        // Spells screen's 8 + 1 lines still fit g_Pix[0..2], and its VRAM
+        // area (D_800A2D90: x 0x180-0x1FF) holds the 2 more halfwords
+        var_s4 += (*(u8*)&MOD_DUB_STATE->textPack == MOD_TEXT_PACK_RT) << 2;
 #endif
     } else {
         var_s4 = 0x3C;

@@ -332,15 +332,24 @@ def build_rt(ram, syms, d, dub_packs):
     texts = sorted({e.new + e.term() for e in ents}, key=lambda t: (-len(t), t))
     fill = [a for a, _ in rooms]
     at = {}
+    placed = []
     for t in texts:
+        # a string that is the tail of one already placed (the same
+        # terminator included) shares its bytes
+        p = next((p for p in placed if p.endswith(t)), None)
+        if p is not None:
+            at[t] = at[p] + len(p) - len(t)
+            continue
+        placed.append(t)
         for k, (a, b) in enumerate(rooms):
             if fill[k] + len(t) <= b:
                 at[t] = fill[k]
                 fill[k] += len(t)
                 break
         else:
-            sys.exit("text packs: the retranslation's strings (%d B) do not fit the %d B of DRA's "
-                     "strings + the overflow rooms" % (sum(map(len, texts)), sum(b - a for a, b in rooms)))
+            sys.exit("text packs: the retranslation's strings (%d B, %d B with shared tails) do not "
+                     "fit the %d B of DRA's strings + the overflow rooms"
+                     % (sum(map(len, texts)), sum(map(len, placed)), sum(b - a for a, b in rooms)))
     img = {}
     for t, a in at.items():
         for k, c in enumerate(t):
@@ -403,7 +412,7 @@ def build_rt(ram, syms, d, dub_packs):
     font = rt_font_blob(d)
     recs.append(("copy", d["MOD_RT_FONT_ADDR"], font))
     info = {"ents": ents, "saves": saves, "notes": notes, "segs": segs, "rooms": rooms,
-            "fill": fill, "strings": len(texts), "string_bytes": sum(map(len, texts)),
+            "fill": fill, "strings": len(texts), "string_bytes": sum(map(len, placed)),
             "font": (d["MOD_RT_FONT_ADDR"], font)}
     return recs, rest, info
 
