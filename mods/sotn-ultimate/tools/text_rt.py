@@ -452,6 +452,33 @@ SATURN = {"equip": list(range(169, 176)), "acc": [90, 91, 92], "relic": [30],
           "enemy": list(range(400, 426))}
 
 
+# Script = Retrans: the Saturn-only entries' names and descriptions in the
+# retranslation's style, written for this project from the Saturn's Japanese
+# text (GAME.PRG; _analysis/saturn_new_items_jp.txt on the builder's PC),
+# approved by Gerardo 2026-11-15. Names not listed keep the mod's name in
+# Title Case; descriptions not listed keep the mod's. Default keeps the
+# mod's text.
+SATURN_RT = {
+    ("equip", 169, "desc"): "Rice long past its prime - eat at your own risk (consumable)",
+    ("equip", 170, "desc"): "A lavish five-star full-course meal (consumable)",
+    ("equip", 171, "name"): "Signed Pencil Board",
+    ("equip", 171, "desc"): "Gotcha!!",
+    ("equip", 172, "desc"): "The bewitched spear Alucard once favored (two-handed)",
+    ("equip", 173, "name"): "Woodland Shield",
+    ("equip", 173, "desc"): "A shield inhabited by a tree spirit (rose-scented)",
+    ("equip", 174, "desc"): "A mysterious dagger from another dimension",
+    ("equip", 175, "name"): "Double Blade Axe",
+    ("equip", 175, "desc"): "Two blades that cut clean through (two-handed)",
+    ("acc", 90, "desc"): "A silver brilliance that rends the darkness",
+    ("acc", 91, "desc"): "A cloak whose color changes over time",
+    ("acc", 92, "name"): "Song Lyrics Card",
+    ("acc", 92, "desc"): "A lyrics card for \"Nocturne\"",
+    ("relic", 30, "desc"): "Dash with →→ (direction key twice)",
+    ("enemy", 420, "name"): "Skeleton Breeder",
+    ("enemy", 425, "name"): "Skeleton Guardian",
+}
+
+
 def title_case(text):
     return " ".join(w[:1].upper() + w[1:] for w in text.split(" "))
 
@@ -681,7 +708,9 @@ def build(ram, syms, report=None):
         elif t == "help":
             rt = jp.enc12(jp.u32(JP_HELP + 4 * i))
         sat = i in SATURN.get(t, ()) and f == "name"
-        if sat:
+        if (t, i, f) in SATURN_RT:
+            e.rt, e.source = SATURN_RT[(t, i, f)], "rt"
+        elif sat:
             e.rt = title_case(from_s(e.us) if e.kind == "s" else e.us.decode())
             e.source = "saturn"
         elif i in SATURN.get(t, ()) or (t == "menu" and i in MENU_KEEP) or (t == "menu" and i >= 85 and not MENU_US_ONLY.get(i)):
