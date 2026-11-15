@@ -124,6 +124,52 @@ while i < len(d):
 else: sys.exit('DRA.BIN not found on the patched JP disc')
 PY
     echo "3d038c447f75bb705fd39e8744c150959da9208c  disks/jpre/DRA.BIN" | sha1sum -c -
+    # and its font page (the 8 px font: gen_rt_font8.py)
+    mkdir -p disks/jpre/BIN
+    python3 - "$JPRE_BIN" disks/jpre/BIN/F_GAME.BIN <<'PY'
+import struct, sys
+f = open(sys.argv[1], 'rb')
+def sec(n):
+    f.seek(n * 2352); return f.read(2352)[24:24 + 2048]
+def rd(l, s): return b''.join(sec(l + i) for i in range((s + 2047) // 2048))[:s]
+def find(l, s, parts):
+    d = rd(l, s); i = 0
+    while i < len(d):
+        n = d[i]
+        if n == 0: i = (i // 2048 + 1) * 2048; continue
+        r = d[i:i + n]; name = r[33:33 + r[32]].decode('latin1').split(';')[0]
+        e, sz = struct.unpack('<I', r[2:6])[0], struct.unpack('<I', r[10:14])[0]
+        if name == parts[0]:
+            return rd(e, sz) if len(parts) == 1 else find(e, sz, parts[1:])
+        i += n
+    sys.exit('not found on the patched JP disc: ' + parts[0])
+root = sec(16)[156:190]
+open(sys.argv[2], 'wb').write(find(struct.unpack('<I', root[2:6])[0], struct.unpack('<I', root[10:14])[0], ['BIN', 'F_GAME.BIN']))
+PY
+    echo "01e4a76232a68f2ce8590e73a59711b866c92852  disks/jpre/BIN/F_GAME.BIN" | sha1sum -c -
+    # and the Librarian (its RT text: text_rt.py lib_rt)
+    mkdir -p disks/jpre/ST/LIB
+    python3 - "$JPRE_BIN" disks/jpre/ST/LIB/LIB.BIN <<'PY'
+import struct, sys
+f = open(sys.argv[1], 'rb')
+def sec(n):
+    f.seek(n * 2352); return f.read(2352)[24:24 + 2048]
+def rd(l, s): return b''.join(sec(l + i) for i in range((s + 2047) // 2048))[:s]
+def find(l, s, parts):
+    d = rd(l, s); i = 0
+    while i < len(d):
+        n = d[i]
+        if n == 0: i = (i // 2048 + 1) * 2048; continue
+        r = d[i:i + n]; name = r[33:33 + r[32]].decode('latin1').split(';')[0]
+        e, sz = struct.unpack('<I', r[2:6])[0], struct.unpack('<I', r[10:14])[0]
+        if name == parts[0]:
+            return rd(e, sz) if len(parts) == 1 else find(e, sz, parts[1:])
+        i += n
+    sys.exit('not found on the patched JP disc: ' + parts[0])
+root = sec(16)[156:190]
+open(sys.argv[2], 'wb').write(find(struct.unpack('<I', root[2:6])[0], struct.unpack('<I', root[10:14])[0], ['ST', 'LIB', 'LIB.BIN']))
+PY
+    echo "e062568618ec1873d3ab75ae2a032c1ae817671c  disks/jpre/ST/LIB/LIB.BIN" | sha1sum -c -
     echo "disks: us $(find disks/us -type f | wc -l) files, saturn $(find disks/saturn -type f | wc -l), psp $(find disks/psp -type f | wc -l)"
 }
 s12_bootstrap() { # a fresh clone is circular: generators need a prior build (addon-docs/env/setup.sh 8b.4)
