@@ -899,7 +899,9 @@ void* func_us_801B0C40(u8* pix, const char* str, s32 x, s32 y, s32 size) {
     s_6 = 0;
     ptr = pix;
 #if defined(MOD_RT_FONT_ADDR) && MOD_LIB_RT_ON
-    if (MOD_LIB_RT() && ModLibRtText(pix, str, x, y, size)) {
+    if (MOD_LIB_RT() &&
+        ModLibRtText(pix, str, x, y, size,
+                     size == MOD_LIB_SHOP_DESC_SIZE ? MOD_LIB_SHOP_DESC_W : 0)) {
         return &pix[(size << 4) << 1];
     }
 #endif
@@ -4706,6 +4708,26 @@ Primitive* func_us_801B7D10(Primitive* prim, u16 arg1, s16 posY) {
     s16 x = 0x84;
     s16 y = 8;
     s32 i;
+#if defined(MOD_RT_FONT_ADDR) && MOD_LIB_RT_ON
+    // Script = Retrans: the patch's element symbols (gen_rt_font8.py) and
+    // "None" in the text's colour, as the patch draws them
+    if (MOD_LIB_RT()) {
+        char sym[3];
+        if ((arg1 & ELEMENT_ALL) == 0) {
+            return func_us_801B1064(prim, 0x84, posY, D_us_8018181C[0], 0x196);
+        }
+        sym[1] = 0xFF;
+        sym[2] = 0;
+        for (i = 0; i < LEN(D_us_801818A8); i++) {
+            if (arg1 & D_us_801818A8[i]) {
+                sym[0] = MOD_RT_ICON_TILE0 + i;
+                prim = func_us_801B1064(prim, x, posY, sym, 0x196);
+                x += MOD_LIB_ICON_STEP;
+            }
+        }
+        return prim;
+    }
+#endif
     if ((arg1 & ELEMENT_ALL) == 0) {
         prim = func_us_801B1064(prim, 0x84, posY, D_us_8018181C[0], 0x159);
     } else {

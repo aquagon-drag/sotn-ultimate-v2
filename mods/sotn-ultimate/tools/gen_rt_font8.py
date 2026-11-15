@@ -66,6 +66,22 @@ def main():
         rows = tile(us_page, c) if t is None else tile(jp_page, t)
         for buf in (us, f2):
             put(buf, text_rt.RT8_TILE0 + c, rows)
+    # the element symbols: the patch's 12 px glyphs with ModRtText's shadow
+    # (right and below), the 8 rows with the most body pixels
+    widths, glyphs = text_rt.rt_font()
+    for k, code in enumerate(text_rt.RT_ICON_CODES):
+        g = glyphs[12 * (code - 0x20):][:12]
+        img, prev = [], 0
+        for r in range(13):
+            m = g[r] << 8 if r < 12 else 0
+            sh = ((m | prev) >> 1) | prev
+            prev = m
+            img.append([6 if m & (0x8000 >> x) else 1 if sh & (0x8000 >> x) else 0 for x in range(8)])
+        s = max(range(6), key=lambda s: (sum(v == 6 for row in img[s:s + 8] for v in row),
+                                         sum(v == 1 for row in img[s:s + 8] for v in row)))
+        rows = [bytes(row[2 * i] | row[2 * i + 1] << 4 for i in range(4)) for row in img[s:s + 8]]
+        for buf in (us, f2):
+            put(buf, text_rt.RT_ICON_TILE0 + k, rows)
     # the patch's glyphs have a shadow (colour 1; the body is colour 6, as
     # the US glyphs). The menu's one-colour CLUTs for dimmed and marked text
     # (menu.c MenuDrawImg: 0x15D red, 0x15E black = the files' CLUTs 0x5D /

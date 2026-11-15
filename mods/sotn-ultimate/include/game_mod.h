@@ -429,6 +429,9 @@ typedef struct {
 #define MOD_RT8_CHARS 0x60
 #define MOD_RT8_TILE0 0x60
 #define MOD_RT8_FINAL 0x100
+// and the patch's element symbols (the Librarian's Strong / Immune / Weak /
+// Absorb rows), 11 tiles from here (text_rt.py RT_ICON_CODES)
+#define MOD_RT_ICON_TILE0 0xC0
 typedef struct {
     u32 cfg[4]; // ModXaConfig's redirected XaMusicConfig
     ModJpDubTable jp;

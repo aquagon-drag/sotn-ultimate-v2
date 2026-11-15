@@ -330,6 +330,12 @@ RT8_CHARS, RT8_TILE0 = 0x60, 0x60  # as game_mod.h MOD_RT8_CHARS / MOD_RT8_TILE0
 RT8_CODE = {",": 0x07, "'": 0x1B, "~": 0x0C}
 RT8_SPACE = 0x5F
 RT8_NONE = "[]_"  # the patch has accented letters there: the US glyph stays
+# the patch's element symbols (its 12 px font's codes, LIB's element table)
+# in the Librarian's order (e_shop.c D_us_8018187C: HOL DRK FIR THU ICE H2O
+# STN PSN CUR CUT HIT), drawn by gen_rt_font8.py as 8x8 tiles from
+# RT_ICON_TILE0 (unused kana tiles; game_mod.h MOD_RT_ICON_TILE0)
+RT_ICON_CODES = [0x7C, 0x85, 0x7D, 0x84, 0x7F, 0x7E, 0x83, 0x81, 0x82, 0x7B, 0x80]
+RT_ICON_TILE0 = 0xC0
 
 
 def rt8_table():

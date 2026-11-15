@@ -47,8 +47,9 @@ extern u8* D_8013794C;
 static s32 ModRtNext(const u8** ps);
 
 // str: the BIOS renderer's string, drawn into its cleared 16-row texture
-// line at D_8013794C, w bytes (2 pixels each) a row. 1: drawn; 0: not (a
-// character the font lacks: the BIOS font draws it)
+// line at D_8013794C, w bytes (2 pixels each) a row. Drawn: 1 + the pen's
+// advance (the Librarian's shop cuts a line with it, e_shop_mod_rt.h); 0:
+// not (a character the font lacks: the BIOS font draws it)
 s32 ModRtText(const u8* str, s32 w) {
     const u8* s;
     u8* d;
@@ -85,7 +86,7 @@ s32 ModRtText(const u8* str, s32 w) {
         }
         pen += g_ModRtW[g];
     }
-    return 1;
+    return pen + 1;
 }
 
 // Shift-JIS 0x81xx -> glyph (text_rt.py reads this table): the patch's
