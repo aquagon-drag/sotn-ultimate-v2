@@ -69,16 +69,18 @@ static const char g_BestLbl[] =
     _S("LV") _S("HP") _S("Exp") _S("Drop Items") _S("Strong VS.") _S("Immune")
         _S("Weak VS.") _S("Absorb") _S("None") _S("????????");
 static const char g_BestEl[] = _S("HOLDRKFIRTHUICEH2OSTNPSNCURCUTHIT");
-static const u16 g_BestElBit[] = {
-    ELEMENT_HOLY,  ELEMENT_DARK,  ELEMENT_FIRE,  ELEMENT_THUNDER,
-    ELEMENT_ICE,   ELEMENT_WATER, ELEMENT_STONE, ELEMENT_POISON,
-    ELEMENT_CURSE, ELEMENT_CUT,   ELEMENT_HIT};
+// their element bits (1 << n): HOLY DARK FIRE THUNDER ICE WATER STONE
+// POISON CURSE CUT HIT
+static const u8 g_BestElBit[] = {12, 11, 15, 14, 13, 10, 9, 7, 8, 6, 5};
 static s32 g_BestPage = 0; // 1: the detail page
 static s32 g_BestLd = 0;   // its loading step (BestLoad)
 static s32 g_BestOvl = 0;  // g_LoadOvlIdx before a chunk read
 static u32 g_BestAt = 0;   // the LIB.BIN address being read
 static s32 g_BestN = 0;    // description bytes copied
-static u8 g_BestDesc[128] = {1};
+// the description read (the end of g_Pix[2]: the picture fills 0x5800
+// bytes from g_Pix[0], the two text lines are drawn from g_Pix[0])
+#define g_BestDesc (g_Pix[2] + 0x1800)
+#define BEST_DESC_LEN 128
 #define BEST_PIC_X 0x180
 #define BEST_PIC_Y 0x80
 #define BEST_CHUNK ((const u8*)0x801E8000)
@@ -286,7 +288,7 @@ static void BestLoad(s32 e) {
     case 3:
     case 4:
         start = off;
-        while (off < 0x2000 && g_BestN < LEN(g_BestDesc) - 1) {
+        while (off < 0x2000 && g_BestN < BEST_DESC_LEN - 1) {
             if (!(g_BestDesc[g_BestN++] = BEST_CHUNK[off++])) {
                 break;
             }
@@ -342,20 +344,17 @@ static void BestElems(u16 m, s32 y, MenuContext* ctx) {
     s[3] = 0xFF;
     s[4] = 0;
     for (i = 0; i < LEN(g_BestElBit); i++) {
-        if (m & g_BestElBit[i]) {
+        if (m & (1 << g_BestElBit[i])) {
+            s[0] = g_BestEl[i * 3];
+            s[1] = g_BestEl[i * 3 + 1];
+            s[2] = g_BestEl[i * 3 + 2];
             if (BEST_RT()) {
                 s[0] = MOD_RT_ICON_TILE0 + i;
                 s[1] = 0xFF;
                 s[2] = 0;
-                MenuDrawStr(s, x, y, ctx);
-                x += 12;
-            } else {
-                s[0] = g_BestEl[i * 3];
-                s[1] = g_BestEl[i * 3 + 1];
-                s[2] = g_BestEl[i * 3 + 2];
-                MenuDrawStr(s, x, y, ctx);
-                x += 28;
             }
+            MenuDrawStr(s, x, y, ctx);
+            x += BEST_RT() ? 12 : 28;
         }
     }
 }
