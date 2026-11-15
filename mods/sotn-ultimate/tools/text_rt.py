@@ -710,6 +710,7 @@ def build(ram, syms, report=None):
     overrides = read_overrides()
     for e in ents:
         decide(e, overrides)
+        centre_main_menu(e)
     saves = save_messages(ram, syms, jp)
     return ents, saves, notes
 
@@ -743,6 +744,25 @@ def measure(e, data):
 
 def encode(e, text):
     return to_s(text) if e.kind == "s" else to_bios(text)
+
+
+# The pause menu's five entries (menu.c func_800F8754): DRA draws each at a
+# fixed x that centres the US word in 8 px characters (the box's centre is
+# x + 38). With the RT 8 px font the words are narrower: leading spaces
+# centre them again, to within a space's width (Default is not affected:
+# these are the RT pack's strings)
+MAIN_MENU_X = {92: 18, 93: 14, 94: 14, 95: 14, 96: 2}
+MAIN_MENU_CENTRE = 38
+
+
+def centre_main_menu(e):
+    if e.table != "menu" or e.idx not in MAIN_MENU_X or not rt8_on() or e.new is None:
+        return
+    text = e.new.lstrip(b"\x00")
+    sp = rt8_width(b"\x00")
+    k = round((MAIN_MENU_CENTRE - MAIN_MENU_X[e.idx] - rt8_width(text) / 2) / sp)
+    e.new = b"\x00" * max(k, 0) + text
+    e.measure = rt8_width(e.new)
 
 
 def decide(e, overrides):
