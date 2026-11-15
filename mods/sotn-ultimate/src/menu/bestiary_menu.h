@@ -106,13 +106,14 @@ static void BestInput(void) {
         cur = g_BestCur & 1;
     }
     if (cur >= BEST_CELLS) {
-        cur = cur - 2 >= 0 && (cur ^ 1) < BEST_CELLS && (cur & 1)
-                  ? cur ^ 1 : g_BestCur;
         if (rep & (PAD_DOWN | PAD_R1)) {
+            // the last row, same column (or the cell left of a blank one)
             cur = (BEST_LINES - 1) * 2 + (g_BestCur & 1);
             if (cur >= BEST_CELLS) {
-                cur--;
+                cur = BEST_CELLS - 1;
             }
+        } else {
+            cur = g_BestCur;
         }
     }
     if (cur != g_BestCur) {
