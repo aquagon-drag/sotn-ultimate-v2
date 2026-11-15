@@ -52,6 +52,7 @@ extern s32 g_Cd[]; // CdThing (src/dra/dra.h): [4] D_80137F70, [5] F74,
 #define MENU_DG_BG 1
 #define MENU_DG_FAMILIARS 15
 #define MENU_STEP_OPENED 0x10
+#define MENU_STEP_FAMILIAR_INIT 0x70
 #define MOD_STEP_BEST 0x7F
 #define BEST_ROW 5 // the main box's sixth row
 #define BEST_X0 28 // the list's two columns
@@ -83,6 +84,10 @@ static const char g_BestEl[] = _S("HOLDRKFIRTHUICEH2OSTNPSNCURCUTHIT");
 // POISON CURSE CUT HIT
 static const u8 g_BestElBit[] = {12, 11, 15, 14, 13, 10, 9, 7, 8, 6, 5};
 static s32 g_BestPage = 0; // 1: the detail page
+// 1 from the Bestiary's opening to the next Familiars screen: the shared
+// window is the Bestiary's while it closes (Triangle, or Start: the exit
+// steps still draw it), so the Familiars screen is not drawn in it
+static s32 g_BestOwn = 0;
 static s32 g_BestLd = 0;   // its loading step (BestLoad)
 static s32 g_BestOvl = 0;  // g_LoadOvlIdx before a chunk read
 static u32 g_BestAt = 0;   // the LIB.BIN address being read
@@ -128,6 +133,8 @@ void ModBestInput(s32* nav, u8 nOptions, u32 type) {
         box->unk1C = 3; // MenuShow
         box->unk1D = 0;
         g_MenuStep = MOD_STEP_BEST;
+        g_BestOwn = 1;
+        g_BestPage = 0; // (a page left open by a Start exit)
     }
 }
 
@@ -448,7 +455,13 @@ void ModBestDraw(MenuContext* ctx) {
     u16 enemy;
 
     if (g_MenuStep != MOD_STEP_BEST) {
-        MenuFamiliarsDraw(ctx);
+        if (g_MenuStep == MENU_STEP_FAMILIAR_INIT ||
+            g_MenuStep == MENU_STEP_FAMILIAR_INIT + 1) {
+            g_BestOwn = 0;
+        }
+        if (!g_BestOwn) {
+            MenuFamiliarsDraw(ctx);
+        }
         return;
     }
     D_8013784C = 0;
