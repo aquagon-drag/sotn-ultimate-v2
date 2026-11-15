@@ -362,7 +362,7 @@ static void BestElems(u16 m, s32 y, MenuContext* ctx) {
 // a drop's name (src/st/lib/e_shop.c func_us_801B7C94)
 static const char* BestItem(u16 id) {
     if (id < 0x80) {
-        return BestLabel(id ? 9 : 8); // (no other kind is listed)
+        return BestLabel(8); // None (no other kind is listed)
     }
     id -= 0x80;
     if (id >= MOD_DROP_HAND_BASE) {
@@ -439,10 +439,6 @@ void ModBestDraw(MenuContext* ctx) {
     if (g_MenuStep != MOD_STEP_BEST) {
         MenuFamiliarsDraw(ctx);
         return;
-    }
-    if (g_BestCur >= BEST_CELLS) {
-        g_BestCur = 0; // (a list of another size)
-        g_BestTop = 0;
     }
     D_8013784C = 0;
     MenuDrawStr(g_BestNo, 284, 36, ctx);
