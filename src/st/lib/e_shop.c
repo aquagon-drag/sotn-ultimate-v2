@@ -105,8 +105,9 @@ static u16 D_us_80180E90[] = {
 
 static const char* D_us_80180FB4[] = {
 #ifdef MOD_SATURN
-    // (the pause menu's Bestiary does not wrap a line: its break, where the
-    // Librarian's own wrap put it)
+    // (the only US description with no line break: the Librarian wraps it
+    // at its width, the pause menu's Bestiary does not wrap; the Librarian
+    // now breaks it here too)
     "Destroyed by Richter in １７９２．@（５ years ago）",
 #else
     "Destroyed by Richter in １７９２．（５ years ago）",
