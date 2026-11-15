@@ -1305,11 +1305,19 @@ void EntityRelicOrb(Entity* self) {
 #else
     msg = g_RelicOrbTexts[0];
     chPix = g_Pix[0];
+#if !defined(MOD_MAIN_TEXT_ADDR)
     var_v0_5 = (u8*)chPix;
     for (i = 0; i < 0xC00; i++) {
         *var_v0_5++ = 0;
     }
+#endif
 
+#if defined(MOD_MAIN_TEXT_ADDR)
+    // SOTN Ultimate: the shared code (include/game_mod.h MOD_MAIN_TEXT_ADDR;
+    // the RT 12 px font under Script = Retrans), which clears chPix too
+    msgLen = ((s32(*)(const char*, const char*, u8*))MOD_MAIN_TEXT(
+        MOD_MAIN_TEXT_RELIC))(msg, g_api.relicDefs[relicId].name, chPix);
+#else
     msgLen = 0;
     while (true) {
         if (*msg == 0) {
@@ -1322,6 +1330,7 @@ void EntityRelicOrb(Entity* self) {
             msg = BlitChar(msg, &msgLen, chPix, 0xC0);
         }
     }
+#endif
 
     LoadTPage(chPix, 0, 0, 0, 0x100, 0x180, 0x10);
 #endif
@@ -1686,6 +1695,12 @@ void EntityMessageBox(Entity* self) {
             *chPix++ = 0;
         }
 
+#if defined(MOD_MAIN_TEXT_ADDR)
+        // SOTN Ultimate: the shared code (include/game_mod.h
+        // MOD_MAIN_TEXT_ADDR; the RT 12 px font under Script = Retrans)
+        ((void (*)(const char*, u8*, s32))MOD_MAIN_TEXT(MOD_MAIN_TEXT_BOX))(
+            str, dstPix, self->ext.messageBox.width);
+#else
         chPix = dstPix;
         while (true) {
             if (*str == 0) {
@@ -1700,6 +1715,7 @@ void EntityMessageBox(Entity* self) {
                     str, &xOffset, chPix, self->ext.messageBox.width >> 1);
             }
         }
+#endif
         LoadTPage((u_long*)dstPix, 0, 0, VramX, VramY,
                   self->ext.messageBox.width, self->ext.messageBox.height);
 #elif defined(VERSION_PSP)

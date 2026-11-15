@@ -365,6 +365,18 @@ typedef struct {
 // 4 * g_LoadOvlIdx, so g_LoadOvlIdx = MOD_TEXT_CD_IDX + chunk and no CdFile
 // changes. SEL reads them in its own RAM (MOD_TEXT_SEL_CHUNK).
 #define MOD_TEXT_MAGIC 0x4B505854 // "TXPK"
+// The stages' shared text code (step 6b, mods/sotn-ultimate/src/menu/
+// main_text.c): in the boot executable over libgpu's unused debug font
+// (kanjiclut + D_8002BA18, src/main/psxsdk/libgpu/font.c), a table of its
+// entries first. The stages' BlitChar, BottomCornerText and EntityRelicOrb /
+// EntityMessageBox text loops call them (Script = Retrans: the RT fonts).
+#define MOD_MAIN_TEXT_ADDR 0x8002B818
+#define MOD_MAIN_TEXT_LEN 0xA00
+#define MOD_MAIN_TEXT(k) (*(void**)(MOD_MAIN_TEXT_ADDR + 4 * (k)))
+#define MOD_MAIN_TEXT_BLIT 0   // BlitChar(str, xOffset, pix, stride)
+#define MOD_MAIN_TEXT_RELIC 1  // msgLen = (pre, name, pix): "Obtained X"
+#define MOD_MAIN_TEXT_BOX 2    // (str, pix, width): a message box's lines
+#define MOD_MAIN_TEXT_CORNER 3 // BottomCornerText(str, leftAlign)
 // The file select's area names in the retranslation (step 6b): the last
 // MOD_SEL_RT_PLACES_LEN bytes of that dead copy (the chunks stop before
 // them), written with the chunks by text_packs.py --apply when the build has

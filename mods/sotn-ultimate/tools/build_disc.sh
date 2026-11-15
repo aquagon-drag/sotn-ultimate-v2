@@ -107,6 +107,9 @@ $NODE --no-warnings mods/sotn-ultimate/tools/builder/node/stage_sounds.ts
 python3 mods/sotn-ultimate/tools/patch_status_asm.py
 # the Song Lyrics Card: the Saturn Yousei's singing rule in TT_005
 python3 mods/sotn-ultimate/tools/patch_tt005_song.py
+# the stages' shared text code, in main.exe's debug font (step 6b):
+# build/us/mod/main_text/*.h, which src/main/psxsdk/libgpu/font.c includes
+bash mods/sotn-ultimate/tools/build_main_text.sh
 make build_assets >/dev/null
 # The PSP (Dracula X Chronicles) English dub and script next to the PS1 ones,
 # toggled in game (Player Select "Dub" row, include/game.h MOD_PSP_DUB_ON);

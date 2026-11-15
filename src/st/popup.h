@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include <stage.h>
 
+#if defined(MOD_MAIN_TEXT_ADDR) && defined(VERSION_US) && !defined(VERSION_PSP) &&  \
+    !defined(VERSION_BETA)
+// SOTN Ultimate: the shared copy in the boot executable (include/
+// game_mod.h MOD_MAIN_TEXT_ADDR; the RT 8 px font under Script = Retrans)
+void BottomCornerText(u8* str, u8 leftAlign) {
+    ((void (*)(u8*, u8))MOD_MAIN_TEXT(MOD_MAIN_TEXT_CORNER))(str, leftAlign);
+}
+#else
 void BottomCornerText(u8* str, u8 leftAlign) {
     u8 toPrint[64];
     Primitive* prim;
@@ -195,3 +203,4 @@ void BottomCornerText(u8* str, u8 leftAlign) {
     }
     g_unkGraphicsStruct.BottomCornerTextTimer = 0x130;
 }
+#endif

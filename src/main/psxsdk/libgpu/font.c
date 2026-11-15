@@ -25,11 +25,16 @@ STATIC_PAD_BSS(2);
 static FntStream Font[4] = {0};
 static s32 D_8002B810 = 0;
 static s32 D_8002B814 = 0;
+// SOTN Ultimate (step 6b): the debug font's CLUT and glyphs (read by
+// FntLoad only, which nothing calls) hold the stages' shared text code
+// instead (mods/sotn-ultimate/src/menu/main_text.c, include/game_mod.h
+// MOD_MAIN_TEXT_ADDR): the same sizes, so main.exe's layout is retail's.
+// build_main_text.sh writes these two (build_disc.sh runs it first).
 static u16 kanjiclut[] = {
-#include "../../gen/kanjiclut.h"
+#include "../../../../build/us/mod/main_text/kanjiclut.h"
 };
 static u8 D_8002BA18[] = {
-#include "../../gen/D_8002BA18.h"
+#include "../../../../build/us/mod/main_text/D_8002BA18.h"
 };
 static s32 D_8002C218 = 0;
 static char* D_8002C21C = "0123456789ABCDEF";

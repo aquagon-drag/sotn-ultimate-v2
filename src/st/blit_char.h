@@ -8,6 +8,14 @@
 //
 #include <stage.h>
 
+#if defined(MOD_MAIN_TEXT_ADDR) && defined(VERSION_US) && !defined(VERSION_PSP)
+// SOTN Ultimate: the shared copy in the boot executable (include/
+// game_mod.h MOD_MAIN_TEXT_ADDR)
+const char* BlitChar(const char* str, u16* xOffset, u8* pix, u16 stride) {
+    return ((const char* (*)(const char*, u16*, u8*, u16))MOD_MAIN_TEXT(
+        MOD_MAIN_TEXT_BLIT))(str, xOffset, pix, stride);
+}
+#else
 const char* BlitChar(const char* str, u16* xOffset, u8* pix, u16 stride) {
     const u16 DOUBLE_SPACE = 0x8140;
     const u16 RIGHT_DOUBLE_QUOTATION_MARK = 0x8168;
@@ -112,3 +120,4 @@ const char* BlitChar(const char* str, u16* xOffset, u8* pix, u16 stride) {
     *xOffset += letterWidth + chSize;
     return str;
 }
+#endif
