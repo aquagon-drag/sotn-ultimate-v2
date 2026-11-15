@@ -104,7 +104,13 @@ static u16 D_us_80180E90[] = {
 #endif
 
 static const char* D_us_80180FB4[] = {
+#ifdef MOD_SATURN
+    // (the pause menu's Bestiary does not wrap a line: its break, where the
+    // Librarian's own wrap put it)
+    "Destroyed by Richter in １７９２．@（５ years ago）",
+#else
     "Destroyed by Richter in １７９２．（５ years ago）",
+#endif
     "Revives due to blood soaked@bones．",
     "Vampire bats．@Feared as servants of evil．",
     "Indestructible spinning skull．",

@@ -226,9 +226,7 @@ static s32 BestChunk(u32 a, s32* off) {
     return idx;
 }
 
-static s32 BestCdBusy(void) {
-    return g_CdStep != CdStep_None || g_IsUsingCd;
-}
+#define BestCdBusy() (g_CdStep != CdStep_None || g_IsUsingCd)
 
 static void BestRead(u32 a) {
     s32 off;
@@ -244,19 +242,19 @@ static void BestRead(u32 a) {
 // the menu's text page instead; puts DRA's back when done
 static void (*g_BestPicOld)(void) = (void*)1;
 static void BestPicCb(void) {
-    s32 len = g_Cd[11] ? 0x800 : g_Cd[12];
-    u8* d = g_Pix[0] + g_Cd[5] * 0x800;
-    u8* s = D_801EC000 + g_Cd[4] * 0x800;
+    s32* cd = g_Cd;
+    s32 len = cd[11] ? 0x800 : cd[12];
+    u8* d = g_Pix[0] + cd[5] * 0x800;
+    u8* s = D_801EC000 + cd[4] * 0x800;
 
     while (len--) {
         *d++ = *s++;
     }
-    g_Cd[4] = (g_Cd[4] + 1) & 7;
-    g_Cd[5]++;
-    g_Cd[11]--;
-    if (g_Cd[11] < 0 || (g_Cd[11] == 0 && g_Cd[12] == 0)) {
+    cd[4] = (cd[4] + 1) & 7;
+    cd[5]++;
+    if (--cd[11] < 0 || (cd[11] == 0 && cd[12] == 0)) {
         LoadTPage((u_long*)g_Pix[0], 2, 0, BEST_PIC_X, BEST_PIC_Y, 0x60, 0x70);
-        g_Cd[6] = 1;
+        cd[6] = 1;
         g_CdCallbacks[CdCallback_Monster] = g_BestPicOld;
         CdDataCallback(NULL);
     }
@@ -399,10 +397,28 @@ static void BestPage(MenuContext* ctx) {
 
     if (ctx->unk1C == 0) {
         BestLoad(e);
-        // back to the list once the loads are done (they use DRA's state)
-        if ((g_pads[0].tapped & PAD_TRIANGLE) && g_BestLd == 8) {
-            g_BestPage = 0;
-            return;
+        // once the loads are done (they use DRA's state): back to the list,
+        // or the previous / next defeated enemy (Left / Right, as the
+        // Librarian's page)
+        if (g_BestLd == 8) {
+            if (g_pads[0].tapped & PAD_TRIANGLE) {
+                g_BestPage = 0;
+                return;
+            }
+            i = g_pads[0].repeat & PAD_RIGHT ? 1 : g_pads[0].repeat & PAD_LEFT ? -1 : 0;
+            for (e += i; i && e >= 0 && e < BEST_CELLS; e += i) {
+                bit = g_ModLibBit[e];
+                if (g_ModLibEnemy[bit] != 0xFFFF &&
+                    (g_CastleFlags[(bit >> 3) + ENEMY_LIST_190] &
+                     (1 << (bit & 7)))) {
+                    g_api.PlaySfx(SFX_UI_MOVE);
+                    g_BestCur = e;
+                    g_BestLd = 1;
+                    return;
+                }
+            }
+            e = g_BestCur;
+            bit = LIB_BIT(e);
         }
     }
     MenuDrawStr(def->name, 24, 36, ctx);
