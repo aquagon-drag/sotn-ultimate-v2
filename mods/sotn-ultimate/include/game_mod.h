@@ -370,8 +370,10 @@ typedef struct {
 // (kanjiclut + D_8002BA18, src/main/psxsdk/libgpu/font.c), a table of its
 // entries first. The stages' BlitChar, BottomCornerText and EntityRelicOrb /
 // EntityMessageBox text loops call them (Script = Retrans: the RT fonts).
-#define MOD_MAIN_TEXT_ADDR 0x8002B818
-#define MOD_MAIN_TEXT_LEN 0xA00
+// (kanjiclut starts at 0x8002B818; the code is linked 16-aligned, as gcc's
+// .text is, 8 bytes in: the first build put it there 8 bytes early)
+#define MOD_MAIN_TEXT_ADDR 0x8002B820
+#define MOD_MAIN_TEXT_LEN 0x9F8
 #define MOD_MAIN_TEXT(k) (*(void**)(MOD_MAIN_TEXT_ADDR + 4 * (k)))
 #define MOD_MAIN_TEXT_BLIT 0   // BlitChar(str, xOffset, pix, stride)
 #define MOD_MAIN_TEXT_RELIC 1  // msgLen = (pre, name, pix): "Obtained X"

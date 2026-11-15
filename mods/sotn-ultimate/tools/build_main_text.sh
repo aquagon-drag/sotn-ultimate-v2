@@ -52,6 +52,12 @@ if [ -n "$sz" ] && [ $((16#$sz)) -ne 0 ]; then
     echo "FAIL main_text: .bss is not empty"; exit 1
 fi
 mipsel-linux-gnu-objcopy -O binary -j .text -j .rodata -j .data "$OUT/main_text.elf" "$OUT/main_text.bin"
+# .text must start at ADDR exactly (the binary has no address: the stages
+# read the table there)
+vma=$(mipsel-linux-gnu-objdump -h "$OUT/main_text.elf" | awk '$2==".text"{print $4}')
+if [ $((16#$vma)) -ne $((ADDR)) ]; then
+    echo "FAIL main_text: .text at 0x$vma, not at MOD_MAIN_TEXT_ADDR $ADDR"; exit 1
+fi
 python3 - "$OUT" "$ADDR" "$LEN" <<'PYEOF'
 import struct, subprocess, sys
 out, addr, ln = sys.argv[1], int(sys.argv[2], 16), int(sys.argv[3], 16)
@@ -67,10 +73,11 @@ for l in subprocess.run(["mipsel-linux-gnu-nm", out + "/main_text.elf"], capture
 want = [syms[n] for n in ("ModTxtBlitChar", "ModTxtRelic", "ModTxtBox", "ModTxtCorner")]
 if list(struct.unpack_from("<4I", b)) != want:
     sys.exit("FAIL main_text: the entry table is not first")
-b = b + bytes(ln - len(b))
+b = bytes(addr - 0x8002B818) + b + bytes(ln - len(b))  # (kanjiclut's start)
+assert len(b) == 0xA00
 open(out + "/kanjiclut.h", "w").write(
     "".join("0x%04X,\n" % v for v in struct.unpack_from("<256H", b, 0)))
 open(out + "/D_8002BA18.h", "w").write("".join("0x%02X,\n" % v for v in b[0x200:]))
 print("main_text: %d bytes at 0x%08X, %d free (the boot executable's debug font)" % (
-    len(b.rstrip(b"\0")), addr, ln - len(b.rstrip(b"\0"))))
+    len(b.rstrip(b"\0")) - (addr - 0x8002B818), addr, 0xA00 - len(b.rstrip(b"\0"))))
 PYEOF
