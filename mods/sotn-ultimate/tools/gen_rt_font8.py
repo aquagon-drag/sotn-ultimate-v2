@@ -44,7 +44,15 @@ def put(buf, t, rows):
 
 def main():
     us = bytearray(open(US, "rb").read())
+    us_page = bytes(us[PAGE:PAGE + 0x2000])
+    # the US "・" also at US_DOT_TILE (game_mod.h MOD_US_DOT_TILE: the
+    # System screen's locked rows use it in every build)
+    put(us, text_rt.US_DOT_TILE, tile(us_page, 0x65))
     if not text_rt.rt8_on():
+        if os.path.exists(OUT2):
+            f2 = bytearray(open(OUT2, "rb").read())
+            put(f2, text_rt.US_DOT_TILE, tile(us_page, 0x65))
+            open(OUT2, "wb").write(f2)
         open(OUT, "wb").write(us)
         print("rt font8: no disks/jpre: F_GAME.BIN is the US file")
         return
@@ -57,9 +65,9 @@ def main():
         sys.exit("rt font8: %s is not the patched disc's file (SHA-1 %s, expected %s)"
                  % (text_rt.JP_FGAME, h, text_rt.JP_FGAME_SHA1))
     f2 = bytearray(open(OUT2, "rb").read())
-    us_page = bytes(us[PAGE:PAGE + 0x2000])
     if bytes(f2[PAGE:PAGE + 0x2000]) != us_page:
         sys.exit("rt font8: F_GAME2.BIN's font page is not F_GAME.BIN's")
+    put(f2, text_rt.US_DOT_TILE, tile(us_page, 0x65))
     jp_page = jp[PAGE:PAGE + 0x2000]
     tab = text_rt.rt8_table()
     for c, (t, _) in enumerate(tab):

@@ -59,7 +59,13 @@ const char* g_MenuStr[] = {
     _S("Button settings"),
     _S("Cloak lining"),
     _S("Cloak color"),
+#if defined(MOD_US_DOT_TILE)
+    // SOTN Ultimate: tile 0xCC ("ふ") holds the US "・" (include/game_mod.h
+    // MOD_US_DOT_TILE: the RT 8 px font took tile 0x65)
+    _S("ふふふふふ"),
+#else
     _S("・・・・・"),
+#endif
     _S("Exterior"),
     _S("Lining"),
     _S("Right hand"),
