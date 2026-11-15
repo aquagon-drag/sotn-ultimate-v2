@@ -664,7 +664,17 @@ void func_800F5A90(void) {
 void func_800F5AE4(MenuContext* ctx) {
     s32 i, x;
 
+#if defined(VERSION_US) && defined(MOD_RT_FONT_ADDR)
+    // Script = Retrans: the retranslation's info bar (as its patch: text
+    // from x=64, a 296 px line, func_800F99B8's MOD_RT_INFO_W)
+    x = 72;
+    if (*(u8*)&MOD_DUB_STATE->textPack == MOD_TEXT_PACK_RT) {
+        x = 64;
+    }
+    for (i = 0; i < 3; i++, x += 128)
+#else
     for (i = 0, x = 72; i < 3; i++, x += 128)
+#endif
         MenuDrawImg(ctx, x, 201, 128, 16, (i & 1) << 7, func_800F548C(2), 0x1A1,
                     (i / 2) + 6, 1, 0);
 }
@@ -2427,6 +2437,15 @@ void func_800F99B8(const char* str, u32 y, bool arg2) {
 
     if (arg2 == 0) {
         var_s4 = 0x90;
+#if defined(VERSION_US) && defined(MOD_RT_FONT_ADDR)
+        // Script = Retrans: the info bar's line is 296 px, as the
+        // retranslation's patch made it (func_800F5AE4 starts it 8 px
+        // further left); 0x40 more bytes of g_Pix, VRAM x 0x1C8-0x1C9 of
+        // rows 32-47, which no other line uses
+        if (y == 2 && *(u8*)&MOD_DUB_STATE->textPack == MOD_TEXT_PACK_RT) {
+            var_s4 = MOD_RT_INFO_W;
+        }
+#endif
     } else {
         var_s4 = 0x3C;
     }
