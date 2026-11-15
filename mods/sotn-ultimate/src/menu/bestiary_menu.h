@@ -103,7 +103,10 @@ static s32 g_BestN = 0;    // description bytes copied
 static s32 g_BestCur = 0;
 static s32 g_BestTop = 0;
 
-#define BEST_RT() (*(u8*)&MOD_DUB_STATE->textPack == MOD_TEXT_PACK_RT)
+static s32 BestRt(void) {
+    return *(u8*)&MOD_DUB_STATE->textPack == MOD_TEXT_PACK_RT;
+}
+#define BEST_RT() BestRt()
 // "Bestiary"'s width: the RT 8 px font's under Retrans (BEST_RT_W,
 // build_sysopt.sh from text_rt.py)
 #define BEST_NAME_W (BEST_RT() ? BEST_RT_W : 64)
@@ -358,7 +361,8 @@ static void BestLoad(s32 e) {
 // MOD_RT_ICON_TILE0..), or "None"
 static void BestElems(u16 m, s32 y, MenuContext* ctx) {
     char s[5];
-    s32 i, x = 148;
+    s32 i, x = 148, rt = BEST_RT();
+    const char* n = g_BestEl;
 
     if (!(m & ELEMENT_ALL)) {
         MenuDrawStr(BestLabel(8), x, y, ctx);
@@ -366,18 +370,18 @@ static void BestElems(u16 m, s32 y, MenuContext* ctx) {
     }
     s[3] = 0xFF;
     s[4] = 0;
-    for (i = 0; i < LEN(g_BestElBit); i++) {
+    for (i = 0; i < LEN(g_BestElBit); i++, n += 3) {
         if (m & (1 << g_BestElBit[i])) {
-            s[0] = g_BestEl[i * 3];
-            s[1] = g_BestEl[i * 3 + 1];
-            s[2] = g_BestEl[i * 3 + 2];
-            if (BEST_RT()) {
+            s[0] = n[0];
+            s[1] = n[1];
+            s[2] = n[2];
+            if (rt) {
                 s[0] = MOD_RT_ICON_TILE0 + i;
                 s[1] = 0xFF;
                 s[2] = 0;
             }
             MenuDrawStr(s, x, y, ctx);
-            x += BEST_RT() ? 12 : 28;
+            x += rt ? 12 : 28;
         }
     }
 }
