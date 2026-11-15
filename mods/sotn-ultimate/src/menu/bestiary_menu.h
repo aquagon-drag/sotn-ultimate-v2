@@ -67,9 +67,17 @@ static const char g_BestNone[] = _S("--------------");
 static const char g_BestNo[] = _S("No.");
 // (an _S string ends with 0xFF; C adds the 0 only at the end: each needs
 // its own)
-static const char g_BestLbl[] =
-    _S("LV") "\0" _S("HP") "\0" _S("Exp") "\0" _S("Drop Items") "\0" _S(
-        "Strong VS.") "\0" _S("Immune") "\0" _S("Weak VS.") "\0" _S("Absorb") "\0" _S("None") "\0" _S("????????");
+static const char g_BestLbl[] = // clang-format off
+    _S("LV") "\0"
+    _S("HP") "\0"
+    _S("Exp") "\0"
+    _S("Drop Items") "\0"
+    _S("Strong VS.") "\0"
+    _S("Immune") "\0"
+    _S("Weak VS.") "\0"
+    _S("Absorb") "\0"
+    _S("None") "\0"
+    _S("????????"); // clang-format on
 static const char g_BestEl[] = _S("HOLDRKFIRTHUICEH2OSTNPSNCURCUTHIT");
 // their element bits (1 << n): HOLY DARK FIRE THUNDER ICE WATER STONE
 // POISON CURSE CUT HIT
