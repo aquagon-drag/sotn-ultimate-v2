@@ -977,7 +977,12 @@ void MenuDrawChar(char ch, s32 x, s32 y, MenuContext* ctx) {
 }
 #endif
 
+#if defined(VERSION_US) && defined(MOD_RT8_ADDR)
+// (SOTN Ultimate: returns the pen after the string, MenuSpellsDraw's rows)
+s32 MenuDrawStr(const char* str, s32 x, s32 y, MenuContext* ctx) {
+#else
 void MenuDrawStr(const char* str, s32 x, s32 y, MenuContext* ctx) {
+#endif
     const s32 ChWidth = 8;
     const s32 ChHeight = 8;
     s32 temp;
@@ -1023,6 +1028,9 @@ void MenuDrawStr(const char* str, s32 x, s32 y, MenuContext* ctx) {
     }
     D_80137614 = 1;
     func_800F53D4(0x1E, ctx->otIdx + 2);
+#if defined(VERSION_US) && defined(MOD_RT8_ADDR)
+    return x;
+#endif
 }
 
 void MenuDrawInt(s32 number, s32 x, s32 y, MenuContext* ctx) {
@@ -1555,7 +1563,7 @@ void MenuSpellsDraw(MenuContext* ctx) {
         // characters' advances (8 px each in US: the same places; Script =
         // Retrans: its narrower letters without gaps)
         if (spell != SPELL_WING_SMASH) {
-            u8 tail[8];
+            u8 tail[12];
             s32 n = 0;
             s32 k;
             MenuDrawStr(g_SpellDefs[spell].combo, startXCoord, yCoord, ctx);
@@ -1571,10 +1579,9 @@ void MenuSpellsDraw(MenuContext* ctx) {
                     tail[n++] = CH('r');
                 }
             }
-            charNum = startXCoord + (charNum * 8);
-            for (k = 0; k < n; k++) {
-                charNum += MenuDrawChar(tail[k], charNum, yCoord, ctx);
-            }
+            tail[n] = 0xFF;
+            tail[n + 1] = 0;
+            MenuDrawStr(tail, startXCoord + (charNum * 8), yCoord, ctx);
         } else {
 #else
         if (spell != SPELL_WING_SMASH) {
@@ -1622,26 +1629,22 @@ void MenuSpellsDraw(MenuContext* ctx) {
                 CH('?'), startXCoord + 24 + (charNum * 8), yCoord, ctx);
         }
 #if defined(VERSION_US) && defined(MOD_RT8_ADDR)
-        // SOTN Ultimate, Script = Retrans: the cost right after "MP", not
-        // in 8 px cells (US: as before)
-        if (*(u8*)&MOD_DUB_STATE->textPack == MOD_TEXT_PACK_RT) {
-            const u8* s = g_MenuStr[13];
-            charNum = 292;
-            while (*s != 0xFF) {
-                charNum += MenuDrawChar(*s++, charNum, yCoord, ctx);
-            }
-            buttonCFG = g_SpellDefs[spell].mpUsage;
-            if (buttonCFG >= 10) {
-                charNum += MenuDrawChar(
-                    CH('0') + buttonCFG / 10, charNum, yCoord, ctx);
-            }
-            MenuDrawChar(CH('0') + buttonCFG % 10, charNum, yCoord, ctx);
-        } else
-#endif
+        // SOTN Ultimate: the cost (a space before one digit) right after
+        // "MP" (US: the same places as before; Script = Retrans: no gap)
         {
-            MenuDrawStr(g_MenuStr[13], 292, yCoord, ctx);
-            MenuDrawInt(g_SpellDefs[spell].mpUsage, 316, yCoord, ctx);
+            u8 cost[8];
+            buttonCFG = g_SpellDefs[spell].mpUsage;
+            cost[0] = buttonCFG >= 10 ? CH('0') + buttonCFG / 10 : CH(' ');
+            cost[1] = CH('0') + buttonCFG % 10;
+            cost[2] = 0xFF;
+            cost[3] = 0;
+            MenuDrawStr(cost, MenuDrawStr(g_MenuStr[13], 292, yCoord, ctx),
+                        yCoord, ctx);
         }
+#else
+        MenuDrawStr(g_MenuStr[13], 292, yCoord, ctx);
+        MenuDrawInt(g_SpellDefs[spell].mpUsage, 316, yCoord, ctx);
+#endif
     }
     for (i = 0; i < 8; i++) {
         if (g_Status.spells[i] & 0x80) {
