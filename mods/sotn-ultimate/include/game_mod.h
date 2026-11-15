@@ -455,9 +455,8 @@ typedef struct {
 #define MOD_RT8_TILE0 0x60
 #define MOD_RT8_FINAL 0x100
 // and the patch's element symbols (the Librarian's Strong / Immune / Weak /
-// Absorb rows), 11 tiles from here (text_rt.py RT_ICON_CODES). Not 0xC0:
-// the US spell list's "ため" (Tetra Spirit, Sword Brothers) uses that tile
-#define MOD_RT_ICON_TILE0 0xC1
+// Absorb rows), 11 tiles from here (text_rt.py RT_ICON_CODES)
+#define MOD_RT_ICON_TILE0 0xC0
 // The US "・" (tile 0x65, under the RT 8 px font's tiles 0x60-0xBF, both
 // font files) copied to tile 0xCC ("ふ", unused in US text): the System
 // screen's locked rows (src/config_us.h g_MenuStr[19]) use that one

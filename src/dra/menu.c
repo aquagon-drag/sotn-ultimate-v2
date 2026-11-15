@@ -1550,6 +1550,33 @@ void MenuSpellsDraw(MenuContext* ctx) {
             charNum -= 2;
         }
 #endif
+#if defined(VERSION_US) && defined(MOD_RT8_ADDR)
+        // SOTN Ultimate: "+", the buttons and "or" one after another at the
+        // characters' advances (8 px each in US: the same places; Script =
+        // Retrans: its narrower letters without gaps)
+        if (spell != SPELL_WING_SMASH) {
+            u8 tail[8];
+            s32 n = 0;
+            s32 k;
+            MenuDrawStr(g_SpellDefs[spell].combo, startXCoord, yCoord, ctx);
+            tail[n++] = CH('+');
+            for (k = 0; k < 2; k++) {
+                buttonCFG = g_Settings.buttonConfig[k];
+                tail[n++] = g_ChButtons[buttonCFG];
+                if (buttonCFG >= 4) {
+                    tail[n++] = g_ChButtons2[buttonCFG - 4];
+                }
+                if (k == 0) {
+                    tail[n++] = CH('o');
+                    tail[n++] = CH('r');
+                }
+            }
+            charNum = startXCoord + (charNum * 8);
+            for (k = 0; k < n; k++) {
+                charNum += MenuDrawChar(tail[k], charNum, yCoord, ctx);
+            }
+        } else {
+#else
         if (spell != SPELL_WING_SMASH) {
             MenuDrawStr(g_SpellDefs[spell].combo, startXCoord, yCoord, ctx);
             MenuDrawChar(CH('+'), startXCoord + (charNum * 8), yCoord, ctx);
@@ -1584,6 +1611,7 @@ void MenuSpellsDraw(MenuContext* ctx) {
                              startXCoord + (charNum * 8), yCoord, ctx);
             }
         } else {
+#endif
             MenuDrawChar(CH('?'), startXCoord, yCoord, ctx);
             MenuDrawChar(CH('+'), startXCoord + 8, yCoord, ctx);
             MenuDrawStr(
@@ -1593,8 +1621,27 @@ void MenuSpellsDraw(MenuContext* ctx) {
             MenuDrawChar(
                 CH('?'), startXCoord + 24 + (charNum * 8), yCoord, ctx);
         }
-        MenuDrawStr(g_MenuStr[13], 292, yCoord, ctx);
-        MenuDrawInt(g_SpellDefs[spell].mpUsage, 316, yCoord, ctx);
+#if defined(VERSION_US) && defined(MOD_RT8_ADDR)
+        // SOTN Ultimate, Script = Retrans: the cost right after "MP", not
+        // in 8 px cells (US: as before)
+        if (*(u8*)&MOD_DUB_STATE->textPack == MOD_TEXT_PACK_RT) {
+            const u8* s = g_MenuStr[13];
+            charNum = 292;
+            while (*s != 0xFF) {
+                charNum += MenuDrawChar(*s++, charNum, yCoord, ctx);
+            }
+            buttonCFG = g_SpellDefs[spell].mpUsage;
+            if (buttonCFG >= 10) {
+                charNum += MenuDrawChar(
+                    CH('0') + buttonCFG / 10, charNum, yCoord, ctx);
+            }
+            MenuDrawChar(CH('0') + buttonCFG % 10, charNum, yCoord, ctx);
+        } else
+#endif
+        {
+            MenuDrawStr(g_MenuStr[13], 292, yCoord, ctx);
+            MenuDrawInt(g_SpellDefs[spell].mpUsage, 316, yCoord, ctx);
+        }
     }
     for (i = 0; i < 8; i++) {
         if (g_Status.spells[i] & 0x80) {

@@ -335,7 +335,7 @@ RT8_NONE = "[]_"  # the patch has accented letters there: the US glyph stays
 # STN PSN CUR CUT HIT), drawn by gen_rt_font8.py as 8x8 tiles from
 # RT_ICON_TILE0 (unused kana tiles; game_mod.h MOD_RT_ICON_TILE0)
 RT_ICON_CODES = [0x7C, 0x85, 0x7D, 0x84, 0x7F, 0x7E, 0x83, 0x81, 0x82, 0x7B, 0x80]
-RT_ICON_TILE0 = 0xC1  # (0xC0: the US spells' "ため")
+RT_ICON_TILE0 = 0xC0
 US_DOT_TILE = 0xCC  # game_mod.h MOD_US_DOT_TILE: the US "・" (tile 0x65)
 
 
