@@ -71,3 +71,4 @@ mods/sotn-ultimate/tools/builder/web/*.generated.html
 # the tile swap atlases are rebuilt from the discs (tile_atlases.ts)
 mods/sotn-ultimate/tools/gdn_ps1_tiles/*.png
 mods/sotn-ultimate/tools/prs_ps1_tiles/*.png
+src/st/lib/mod_lib_rt.h

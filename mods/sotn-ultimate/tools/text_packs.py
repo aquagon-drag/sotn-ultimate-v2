@@ -671,6 +671,8 @@ def write_header():
             "// %s\n#define MOD_TEXT_RT_ON %d\n" % (msg, 1 if ok else 0))
     changed = write_if_changed(RT_HEADER, text.encode())
     print("text packs: %s%s" % (msg, " (mod_text_rt.h)" if changed else ""))
+    if text_rt.write_lib_header():
+        print("text packs: %s (mod_lib_rt.h)" % text_rt.lib_inputs()[1])
 
 
 def main():

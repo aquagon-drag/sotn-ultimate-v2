@@ -99,6 +99,9 @@ static u16 D_us_80180E90[] = {
 #define LIB_ENEMY(i) D_us_80180E90[i]
 #define LIB_TOP_MAX 0x42
 #endif
+#ifdef MOD_RT_FONT_ADDR
+#include "../../../mods/sotn-ultimate/src/enemies/e_shop_mod_rt.h"
+#endif
 
 static const char* D_us_80180FB4[] = {
     "Destroyed by Richter in １７９２．（５ years ago）",
@@ -895,6 +898,11 @@ void* func_us_801B0C40(u8* pix, const char* str, s32 x, s32 y, s32 size) {
 
     s_6 = 0;
     ptr = pix;
+#if defined(MOD_RT_FONT_ADDR) && MOD_LIB_RT_ON
+    if (MOD_LIB_RT() && ModLibRtText(pix, str, x, y, size)) {
+        return &pix[(size << 4) << 1];
+    }
+#endif
     for (i = 0; i < (size * FontHeight) * 2; i++) {
         *ptr++ = 0;
     }
@@ -1037,6 +1045,9 @@ Primitive* func_us_801B1064(
     s32 i;
     char ch;
     char* chPtr;
+#if defined(MOD_RT_FONT_ADDR) && MOD_LIB_RT_ON
+    s32 rt = MOD_LIB_RT();
+#endif
 
     chPtr = buffer;
     length = 0;
@@ -1103,6 +1114,22 @@ Primitive* func_us_801B1064(
             x += 8;
         }
 #else
+#if defined(MOD_RT_FONT_ADDR) && MOD_LIB_RT_ON
+        // Script = Retrans: the 8 px font's tile and advance (e_shop_mod_rt.h)
+        if (rt && (u8)ch < MOD_RT8_CHARS) {
+            if (ch) {
+                prim->clut = clut;
+                prim->u0 = (s8)((((u8)ch + MOD_RT8_TILE0) & 0x0F) << 3);
+                prim->v0 = (s8)((((u8)ch + MOD_RT8_TILE0) & 0xF0) >> 1);
+                prim->drawMode = DRAW_DEFAULT;
+                prim->x0 = x;
+                prim->y0 = y;
+                prim = prim->next;
+            }
+            x += MOD_LIB_RT8_W[(u8)ch];
+            continue;
+        }
+#endif
         if (ch) {
             prim->clut = clut;
             prim->u0 = (s8)((ch & 0x0F) << 3);
@@ -1341,6 +1368,11 @@ void func_us_801B15C0(Entity* self) {
     case 1:
         for (i = 0; i < self->ext.et_801B15C0.unk84; i++) {
             ptr = D_us_80181310[self->ext.et_801B15C0.unk88[i]];
+#if defined(MOD_RT_FONT_ADDR) && MOD_LIB_RT_ON
+            if (MOD_LIB_RT()) {
+                ptr = g_ModLibRtMenu[self->ext.et_801B15C0.unk88[i]];
+            }
+#endif
             tempVar = *ptr++;
             func_us_801B0FBC(ptr, tempVar, 0x108 + i * 16);
         }
@@ -5014,6 +5046,19 @@ void func_us_801B8234(Entity* self) {
             } else {
                 s3 = D_us_80180FB4[LIB_BIT(self->params)];
             }
+#if MOD_LIB_RT_ON
+            // Script = Retrans: the retranslation's description; the Saturn
+            // monsters' and Maria's (with every dub) are this project's
+            // (text_rt.py SATURN_BESTIARY_RT)
+            if (MOD_LIB_RT()) {
+                if (LIB_BIT(self->params) < MOD_LIB_RETAIL_ENEMIES) {
+                    s3 = g_ModLibRtDesc[LIB_BIT(self->params)];
+                } else if (LIB_BIT(self->params) < MOD_LIB_SATURN_ENEMIES) {
+                    s3 = g_ModLibRtDescSat[LIB_BIT(self->params) -
+                                           MOD_LIB_RETAIL_ENEMIES];
+                }
+            }
+#endif
             func_us_801B0C40(pix, s3, 0, MOD_LIB_DESC_Y, 0x6E);
 #else
             s3 = D_us_80180FB4[self->params];
@@ -5220,7 +5265,14 @@ void func_us_801B8958(Primitive* prim, Entity* self) {
     posY = 16;
     j = self->ext.et_801B6F30.unk82;
     for (i = 0; i < 7; i++, j++) {
+#if defined(MOD_RT_FONT_ADDR) && MOD_LIB_RT_ON
+        prim = func_us_801B1064(prim, 16, posY,
+                                MOD_LIB_RT() ? g_ModLibRtSound[j]
+                                             : D_us_801818F4[j],
+                                0x196);
+#else
         prim = func_us_801B1064(prim, 16, posY, D_us_801818F4[j], 0x196);
+#endif
         posY += 12;
     }
     while (prim != NULL) {
