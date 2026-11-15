@@ -104,7 +104,7 @@ for s in func_800F5E68 MenuDrawStr MenuHandleCursorInput D_8013784C \
     g_LbaSdAlkVb g_CdStep g_IsUsingCd g_LoadFile g_ServantLoaded g_MenuStep     g_LoadOvlIdx g_StageId SsUtAllKeyOff VSync CdInit CdReadyCallback \
     CdDataCallback MenuDrawInt MenuDrawRect func_800F8754 MenuFamiliarsDraw \
     g_MenuNavigation g_CastleFlags g_Timer g_api MenuDrawImg func_800F99B8 \
-    D_8013794C g_Pix D_801EC000 g_CdCallbacks g_Cd LoadTPage; do
+    D_8013794C g_Pix D_801EC000 g_CdCallbacks g_Cd LoadTPage g_PlayableCharacter; do
     a=$(mipsel-linux-gnu-nm build/us/dra.elf | awk -v s="$s" '$3==s{print $1}')
     if [ -z "$a" ]; then # (main SDK functions: config/symbols.us.txt)
         a=$(awk -v s="$s" '$1==s{sub(/;/,"",$3); sub(/^0x/,"",$3); print $3}' config/symbols.us.txt)
