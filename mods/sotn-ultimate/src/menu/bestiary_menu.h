@@ -114,10 +114,9 @@ void ModBestMain(MenuContext* ctx, s32 x, s32 y) {
     func_800F8754(ctx, x, y);
     D_8013784C = 0;
     // the menu was closed (Start) on the Bestiary: its window is still up
-    // when the menu opens again (no exit step hides it), and its page
+    // when the menu opens again (no exit step hides it)
     if (g_MenuStep == MENU_STEP_OPENED && (box->unk1C == 0 || box->unk1C == 3)) {
-        box->unk1C = 2;
-        g_BestPage = 0;
+        box->unk1C = 2; // (the page resets when the Bestiary opens)
     }
     // centred in the 76 px box, as the other rows
     MenuDrawStr(g_BestName, x + 38 - BEST_NAME_W / 2, y + 84, ctx);
