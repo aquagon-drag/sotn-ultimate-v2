@@ -10,8 +10,10 @@
 // and 24): ModBestMain draws the main box's rows plus this one, ModBestInput
 // is the main box's input (six rows; X on Bestiary enters MOD_STEP_BEST),
 // ModBestDraw draws the screen (or the Familiars one) and takes its input.
-// MOD_STEP_BEST is below MENU_STEP_OPENED: MenuHandle has no case for it and
-// Start does not close the menu while it is up.
+// MOD_STEP_BEST has no MenuHandle case (between the Familiars steps 0x70 /
+// 0x71 and System's 0x100): it must be at least MENU_STEP_OPENED, else
+// MenuHandle does not call MenuDraw (nothing drawn, no input: a freeze, the
+// first 7a build). Start closes the menu from it as from any screen.
 #include "../../../../src/st/lib/mod_bestiary.h"
 
 void func_800F8754(MenuContext* ctx, s32 x, s32 y);
@@ -24,7 +26,7 @@ extern MenuNavigation g_MenuNavigation;
 #define MENU_DG_BG 1
 #define MENU_DG_FAMILIARS 15
 #define MENU_STEP_OPENED 0x10
-#define MOD_STEP_BEST 0x0F
+#define MOD_STEP_BEST 0x7F
 #define BEST_ROW 5 // the main box's sixth row
 #define BEST_X0 28 // the list's two columns
 #define BEST_DX 172
