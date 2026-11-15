@@ -1142,10 +1142,19 @@ def sel_places():
     jp = Jp(open(JP_DRA, "rb").read())
     sel = open(JP_SEL, "rb").read()
     out = {}
+    ov = read_overrides()
     for st in range(80):
         name = lib_enc12(jp, sel, struct.unpack_from("<I", sel, SEL_PLACE_TAB + 4 * st)[0]).strip()
-        name = PLAIN.get(name, name)
+        act, text = ov.get("place\t%d\tname" % st, ("rt", None))
+        if act == "us":
+            continue
+        if act == "text":
+            name = text
         if not name:
+            continue
+        if "/" in name:  # (an override's own break)
+            out[st] = tuple(s.strip() for s in name.split("/", 1))
+            assert all(len(s) <= SEL_PLACE_CHARS for s in out[st]), name
             continue
         if len(name) <= SEL_PLACE_CHARS:
             out[st] = (name, "")

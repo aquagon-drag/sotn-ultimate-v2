@@ -6,6 +6,9 @@
 #   table   index   field   action  [text]
 #
 # table:  equip acc relic spell enemy menu help   (the mod's tables)
+#         place   the file select's area names (index: the stage id, as in
+#                 the fit report; field: name; a "/" in the text sets the
+#                 line break, else it breaks at a space, 12 characters a line)
 # index:  the mod's index (decimal or 0x..), as in the fit report
 # field:  name / desc (equip, acc, relic, spell), name (enemy), str (menu, help)
 # action: rt    the retranslation's text as it is, even where it does not fit
