@@ -66,19 +66,10 @@ extern s32 g_Cd[]; // CdThing (src/dra/dra.h): [4] D_80137F70, [5] F74,
 static const char g_BestName[] = _S("Bestiary");
 static const char g_BestNone[] = _S("--------------");
 static const char g_BestNo[] = _S("No.");
-// (an _S string ends with 0xFF; C adds the 0 only at the end: each needs
-// its own)
-static const char g_BestLbl[] = // clang-format off
-    _S("LV") "\0"
-    _S("HP") "\0"
-    _S("Exp") "\0"
-    _S("Drop Items") "\0"
-    _S("Strong VS.") "\0"
-    _S("Immune") "\0"
-    _S("Weak VS.") "\0"
-    _S("Absorb") "\0"
-    _S("None") "\0"
-    _S("????????"); // clang-format on
+static const char* const g_BestLbl[] = {
+    _S("LV"),         _S("HP"),     _S("Exp"),      _S("Drop Items"),
+    _S("Strong VS."), _S("Immune"), _S("Weak VS."), _S("Absorb"),
+    _S("None"),       _S("????????")};
 static const char g_BestEl[] = _S("HOLDRKFIRTHUICEH2OSTNPSNCURCUTHIT");
 // their element bits (1 << n): HOLY DARK FIRE THUNDER ICE WATER STONE
 // POISON CURSE CUT HIT
@@ -214,17 +205,7 @@ static void BestInput(void) {
     }
 }
 
-// the n-th of the packed _S labels
-static const char* BestLabel(s32 n) {
-    const char* s = g_BestLbl;
-
-    while (n--) {
-        while (*s++ != 0xFF) {
-        }
-        s++;
-    }
-    return s;
-}
+#define BestLabel(n) (g_BestLbl[n])
 
 // the LIB.BIN chunk (CdFile_DemoKey reads 4 sectors at its loc + 4 * idx)
 // holding RAM address a, and a's offset in it
@@ -276,6 +257,7 @@ static void BestPicCb(void) {
 // picture. 8: all done
 static void BestLoad(s32 e) {
     s32 bit = LIB_BIT(e);
+    s32 rt = BEST_RT();
     s32 off, start;
     u32 tab;
     u8* s;
@@ -290,16 +272,16 @@ static void BestLoad(s32 e) {
     switch (g_BestLd) {
     case 1:
         g_BestN = 0;
-        if (!BEST_RT() && bit == MOD_LIB_DESC_PSP_BIT && MOD_PSP_DUB_ON()) {
+        if (!rt && bit == MOD_LIB_DESC_PSP_BIT && MOD_PSP_DUB_ON()) {
             BestRead(BEST_LIB_DESC_P); // (the string itself)
             g_BestLd = 3;
             break;
         }
         if (bit < MOD_LIB_RETAIL_ENEMIES) {
-            tab = BEST_RT() && BEST_LIB_RT ? BEST_LIB_RT : BEST_LIB_DESC;
+            tab = rt && BEST_LIB_RT ? BEST_LIB_RT : BEST_LIB_DESC;
         } else {
             bit -= MOD_LIB_RETAIL_ENEMIES;
-            tab = BEST_RT() && BEST_LIB_RT_S &&
+            tab = rt && BEST_LIB_RT_S &&
                           bit < MOD_LIB_SATURN_ENEMIES - MOD_LIB_RETAIL_ENEMIES
                       ? BEST_LIB_RT_S
                       : BEST_LIB_DESC_S;
