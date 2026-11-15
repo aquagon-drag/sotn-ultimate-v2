@@ -2363,7 +2363,14 @@ void func_800F9808(u32 y) {
 
     w = 0;
     if (y == 2) {
+#if defined(VERSION_US) && defined(MOD_RT_FONT_ADDR)
+        // the info bar's line is 296 px (func_800F99B8), as the
+        // retranslation's patch made it; in Default the last 8 are past the
+        // bar's edge (func_800F5AE4)
+        w = 0x28;
+#else
         w = 0x20;
+#endif
     }
     y = func_800F548C(y);
     oldPos = (u_long*)D_8013794C;
@@ -2433,14 +2440,17 @@ void func_800F99B8(const char* str, u32 y, bool arg2) {
     u8* dest_addr;
 
     if (arg2 == 0) {
-        var_s4 = 0x90;
 #if defined(VERSION_US) && defined(MOD_RT_FONT_ADDR)
-        // Script = Retrans: these lines are 296 px (4 bytes a row more), as
-        // the retranslation's patch made them (it widened every line by
-        // 8 px); the info bar starts 8 px further left (func_800F5AE4). The
-        // Spells screen's 8 + 1 lines still fit g_Pix[0..2], and its VRAM
-        // area (D_800A2D90: x 0x180-0x1FF) holds the 2 more halfwords
-        var_s4 += (*(u8*)&MOD_DUB_STATE->textPack == MOD_TEXT_PACK_RT) << 2;
+        // these lines are 296 px (4 bytes a row more), as the
+        // retranslation's patch made them (it widened every line by 8 px).
+        // Default draws the same, but its info bar starts at x=72 and so
+        // shows 288 px of it; Script = Retrans starts it at x=64
+        // (func_800F5AE4). The Spells screen's 8 + 1 lines still fit
+        // g_Pix[0..2], and its VRAM area (D_800A2D90: x 0x180-0x1FF) holds
+        // the 2 more halfwords
+        var_s4 = 0x94;
+#else
+        var_s4 = 0x90;
 #endif
     } else {
         var_s4 = 0x3C;
