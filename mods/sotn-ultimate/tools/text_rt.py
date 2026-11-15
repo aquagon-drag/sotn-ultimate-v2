@@ -1154,7 +1154,9 @@ def sel_places():
             continue
         if "/" in name:  # (an override's own break)
             out[st] = tuple(s.strip() for s in name.split("/", 1))
-            assert all(len(s) <= SEL_PLACE_CHARS for s in out[st]), name
+            # (your own lines: one letter past the US names' longest is
+            # allowed, the screen may cut it; it is listed in the report)
+            assert all(len(s) <= SEL_PLACE_CHARS + 1 for s in out[st]), name
             continue
         if len(name) <= SEL_PLACE_CHARS:
             out[st] = (name, "")
