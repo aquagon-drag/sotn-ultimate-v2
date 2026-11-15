@@ -4861,6 +4861,11 @@ void func_us_801B7DF8(Primitive* prim, Entity* arg1, s16 enemyId) {
     } else {
         clut = 0x159;
     }
+#if defined(MOD_RT_FONT_ADDR) && MOD_LIB_RT_ON
+    if (MOD_LIB_RT()) {
+        clut = 0x196; // Script = Retrans: "None" in the text's colour too
+    }
+#endif
     prim = func_us_801B1064(prim, 0x84, 0x8F, func_us_801B7C94(posX), clut);
     params = LIB_BIT(arg1->params);
     if ((g_CastleFlags[(params >> 3) + ENEMY_LIST_RAREDROP_1B0] &
