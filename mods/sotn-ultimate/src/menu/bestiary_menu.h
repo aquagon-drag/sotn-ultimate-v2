@@ -38,13 +38,10 @@ void MenuDrawImg(MenuContext* ctx, s32 x, s32 y, s32 w, u32 h, s32 u, s32 v,
                  s32 clut, s32 tpage, bool disableTexShade, s32 c);
 void func_800F99B8(const char* str, u32 y, bool arg2);
 extern u8* D_8013794C;
-extern u8 g_Pix[];
 extern u8 D_801EC000[];
 extern void (*g_CdCallbacks[])(void);
 extern s32 g_Cd[]; // CdThing (src/dra/dra.h): [4] D_80137F70, [5] F74,
                    // [6] F78, [11] overlayBlockCount, [12] its last size
-void CdDataCallback(void (*func)());
-void LoadTPage(void* pix, s32 tp, s32 abr, s32 x, s32 y, s32 w, s32 h);
 // LIB.BIN's description tables: their addresses in stlib.elf, -D'd by
 // build_sysopt.sh (the RT two 0 when the build has no RT text):
 // BEST_LIB_DESC D_us_80180FB4 (retail bits), BEST_LIB_DESC_S g_ModLibDesc
@@ -229,7 +226,7 @@ static void BestRead(u32 a) {
 static void (*g_BestPicOld)(void) = (void*)1;
 static void BestPicCb(void) {
     s32 len = g_Cd[11] ? 0x800 : g_Cd[12];
-    u8* d = g_Pix + g_Cd[5] * 0x800;
+    u8* d = g_Pix[0] + g_Cd[5] * 0x800;
     u8* s = D_801EC000 + g_Cd[4] * 0x800;
 
     while (len--) {
@@ -239,7 +236,7 @@ static void BestPicCb(void) {
     g_Cd[5]++;
     g_Cd[11]--;
     if (g_Cd[11] < 0 || (g_Cd[11] == 0 && g_Cd[12] == 0)) {
-        LoadTPage(g_Pix, 2, 0, BEST_PIC_X, BEST_PIC_Y, 0x60, 0x70);
+        LoadTPage((u_long*)g_Pix[0], 2, 0, BEST_PIC_X, BEST_PIC_Y, 0x60, 0x70);
         g_Cd[6] = 1;
         g_CdCallbacks[CdCallback_Monster] = g_BestPicOld;
         CdDataCallback(NULL);
@@ -312,7 +309,7 @@ static void BestLoad(s32 e) {
         if (*s) {
             *s++ = 0;
         }
-        D_8013794C = g_Pix;
+        D_8013794C = g_Pix[0];
         func_800F99B8((const char*)g_BestDesc, 0x80, false);
         func_800F99B8((const char*)s, 0x81, false);
         g_BestLd = 6;
