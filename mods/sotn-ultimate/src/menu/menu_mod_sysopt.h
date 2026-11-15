@@ -14,3 +14,14 @@ void ModSysOptSound(MenuContext* ctx);
 #define MOD_SYSOPT_BOX ModSysOptBox
 #define MOD_SYSOPT_INPUT ModSysOptInput
 #define MOD_SYSOPT_SOUND ModSysOptSound
+// the pause menu's sixth row, "Bestiary" (step 7,
+// mods/sotn-ultimate/src/menu/bestiary_menu.h, with sysopt.c): its row in the
+// main box, the main box's input (6 rows; Bestiary opens its screen) and its
+// screen, drawn in the Familiars box's window
+void ModBestMain(MenuContext* ctx, s32 x, s32 y);
+void ModBestInput(s32* nav, u8 nOptions, u32 type);
+void ModBestDraw(MenuContext* ctx);
+#define MOD_BEST_MAIN ModBestMain
+#define MOD_BEST_INPUT ModBestInput
+#define MOD_BEST_DRAW ModBestDraw
+#define MOD_MAIN_ROWS 6

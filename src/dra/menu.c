@@ -55,6 +55,10 @@ extern s32 g_PrevEquippedWeapons[2];
 #define MOD_SYSOPT_BOX func_800F5E68
 #define MOD_SYSOPT_INPUT MenuHandleCursorInput
 #define MOD_SYSOPT_SOUND MenuSoundConfigDraw
+#define MOD_BEST_MAIN func_800F8754
+#define MOD_BEST_INPUT MenuHandleCursorInput
+#define MOD_BEST_DRAW MenuFamiliarsDraw
+#define MOD_MAIN_ROWS 5
 #endif
 
 const char* D_800A2D48[] = {
@@ -897,7 +901,7 @@ void func_800F6568(MenuContext* ctx) {
     s32 height;
     s32 r;
 
-    height = ctx->cursorH / 5;
+    height = ctx->cursorH / MOD_MAIN_ROWS;
     if (g_Timer & 0x20) {
         r = 0x40 + (g_Timer & 0x1F);
     } else {
@@ -1425,6 +1429,10 @@ void MenuDrawStats(s32 menuDialogue) {
 
 #if defined(VERSION_PSP)
         x = 244;
+#elif defined(MOD_ULTIMATE_MENU)
+        // the main box is 16 px taller (the Bestiary row): Time moves right,
+        // under Rooms and Kills, as the PSP version moves it
+        x = 240;
 #else
         x = 208;
 #endif
@@ -2199,7 +2207,7 @@ void MenuDraw(void) {
         switch (i) {
         case MENU_DG_MAIN:
             func_800F6568(menu);
-            func_800F8754(menu, x, y);
+            MOD_BEST_MAIN(menu, x, y);
             break;
         case MENU_DG_BG:
             MenuDrawStats(1);
@@ -2290,7 +2298,7 @@ void MenuDraw(void) {
             MenuEquipSortDraw(menu);
             break;
         case MENU_DG_FAMILIARS:
-            MenuFamiliarsDraw(menu);
+            MOD_BEST_DRAW(menu); // (or the Bestiary screen)
             break;
 #if defined(VERSION_PSP)
         case MENU_PSP_EXTRA_1:
@@ -3267,8 +3275,13 @@ s32 D_800A2DEC[] = {
 };
 
 MenuContextInit g_MenuInit[NUM_MENU] = {
-#if defined(VERSION_US)
+#if defined(VERSION_US) && defined(MOD_ULTIMATE_MENU)
+    {158, 100, 76, 96, 0x40},  // MENU_DG_MAIN (six rows: Bestiary)
+#endif
+#if defined(VERSION_US) && !defined(MOD_ULTIMATE_MENU)
     {158, 100, 76, 80, 0x40},  // MENU_DG_MAIN
+#endif
+#if defined(VERSION_US)
     {0, 24, 360, 200, 0x10},   // MENU_DG_BG
     {0, 24, 360, 97, 0x20},    // MENU_DG_EQUIP_OVERVIEW
     {0, 120, 360, 74, 0x20},   // MENU_DG_EQUIP_SELECTOR
@@ -3864,7 +3877,7 @@ block_4:
             g_MenuStep = MENU_STEP_EXIT_BEGIN;
             goto block_4;
         }
-        MenuHandleCursorInput(&g_MenuNavigation.cursorMain, 5, 0);
+        MOD_BEST_INPUT(&g_MenuNavigation.cursorMain, MOD_MAIN_ROWS, 0);
         if (g_pads[0].tapped & PAD_MENU_SELECT) {
             switch (g_MenuNavigation.cursorMain) {
             case 0:

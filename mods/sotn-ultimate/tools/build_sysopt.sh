@@ -54,6 +54,11 @@ ok = (snd[2:] == [0x10000008, 0x340B000C] and
       syms["ModSysOptInput"] + 12 == syms["ModSysOptGo"] and
       syms["ModSysOptBox"] + 16 == syms["ModSysOptInput"] and
       syms["ModSysOptSound"] + 16 == syms["ModSysOptBox"] and go == want_go)
+# the Bestiary row's three (bestiary_menu.h), right before them
+for name, b, li, nxt in (("ModBestMain", 0x10000014, 0x340B0010, "ModBestInput"),
+                         ("ModBestInput", 0x10000010, 0x340B0014, "ModBestDraw"),
+                         ("ModBestDraw", 0x1000000C, 0x340B0018, "ModSysOptSound")):
+    ok = ok and words(name, 4)[2:] == [b, li] and syms[name] + 16 == syms[nxt]
 if not ok:
     print("FAIL sysopt: DRA's stubs are not as written (config_us.h)")
     sys.exit(1)
@@ -80,7 +85,8 @@ VERSION=us mipsel-linux-gnu-cpp -Iinclude -Iinclude/psxsdk -Isrc/dra -lang-c \
 for s in func_800F5E68 MenuDrawStr MenuHandleCursorInput D_8013784C \
     g_Entities MenuSoundConfigDraw g_Menus g_MenuInit g_LbaSdAlkVh \
     g_LbaSdAlkVb g_CdStep g_IsUsingCd g_LoadFile g_ServantLoaded g_MenuStep     g_LoadOvlIdx g_StageId SsUtAllKeyOff VSync CdInit CdReadyCallback \
-    CdDataCallback; do
+    CdDataCallback MenuDrawInt MenuDrawRect func_800F8754 MenuFamiliarsDraw \
+    g_MenuNavigation g_CastleFlags g_Timer g_api; do
     a=$(mipsel-linux-gnu-nm build/us/dra.elf | awk -v s="$s" '$3==s{print $1}')
     if [ -z "$a" ]; then # (main SDK functions: config/symbols.us.txt)
         a=$(awk -v s="$s" '$1==s{sub(/;/,"",$3); sub(/^0x/,"",$3); print $3}' config/symbols.us.txt)
@@ -113,9 +119,9 @@ size=$(stat -c %s "$OUT/sysopt.bin")
 if [ "$(od -An -tx4 -N4 "$OUT/sysopt.bin" | tr -d ' ')" != "$(printf %08x $MAGIC)" ]; then
     echo "FAIL sysopt: the header is not first"; exit 1
 fi
-# the info bar text: header + 16 (include/game.h MOD_SYSOPT_BAR_TEXT)
-if [ "$(dd if="$OUT/sysopt.bin" bs=1 skip=16 count=5 2>/dev/null)" != "Boss " ]; then
-    echo "FAIL sysopt: the info bar text is not at the header + 16"; exit 1
+# the info bar text: header + 28 (include/game.h MOD_SYSOPT_BAR_TEXT)
+if [ "$(dd if="$OUT/sysopt.bin" bs=1 skip=28 count=5 2>/dev/null)" != "Boss " ]; then
+    echo "FAIL sysopt: the info bar text is not at the header + 28"; exit 1
 fi
 if [ $((OFF + size)) -gt $((LEN)) ]; then
     echo "FAIL sysopt: $size bytes, $((OFF + size - LEN)) past MOD_ARC_F_LEN"

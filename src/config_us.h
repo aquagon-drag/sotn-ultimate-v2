@@ -310,6 +310,27 @@ const
 __asm__(
     ".data\n" // (gcc is in .data here: it ends there too)
     ".align 2\n"
+    // the pause menu's Bestiary row (step 7, bestiary_menu.h): entries 16,
+    // 20 and 24 of the header, for func_800F8754 (the main box's rows),
+    // MENU_STEP_OPENED's MenuHandleCursorInput and MenuFamiliarsDraw
+    ".globl ModBestMain\n"
+    "ModBestMain:\n"
+    "lui $13, %hi(func_800F8754)\n"
+    "addiu $13, $13, %lo(func_800F8754)\n"
+    ".word 0x10000014\n" // b ModSysOptGo
+    ".word 0x340B0010\n" // li $11, 16 (delay slot)
+    ".globl ModBestInput\n"
+    "ModBestInput:\n"
+    "lui $13, %hi(MenuHandleCursorInput)\n"
+    "addiu $13, $13, %lo(MenuHandleCursorInput)\n"
+    ".word 0x10000010\n" // b ModSysOptGo
+    ".word 0x340B0014\n" // li $11, 20 (delay slot)
+    ".globl ModBestDraw\n"
+    "ModBestDraw:\n"
+    "lui $13, %hi(MenuFamiliarsDraw)\n"
+    "addiu $13, $13, %lo(MenuFamiliarsDraw)\n"
+    ".word 0x1000000C\n" // b ModSysOptGo
+    ".word 0x340B0018\n" // li $11, 24 (delay slot)
     ".globl ModSysOptSound\n"
     "ModSysOptSound:\n"
     "lui $13, %hi(MenuSoundConfigDraw)\n"

@@ -73,9 +73,12 @@ void ModSysOptBox(MenuContext* ctx, s32 cursorIdx, s32 x, s32 y, s32 w, s32 h,
                   s32 yGap, s32 bColorMode);
 void ModSysOptInput(s32* nav, u8 nOptions, u32 type);
 void ModSysOptSound(MenuContext* ctx);
+void ModBestMain(MenuContext* ctx, s32 x, s32 y);
+void ModBestInput(s32* nav, u8 nOptions, u32 type);
+void ModBestDraw(MenuContext* ctx);
 
 // the header the stubs read (first in .text, at MOD_SYSOPT_ADDR): the
-// magic, the three entries, then the info bar text (MOD_SYSOPT_BAR_TEXT;
+// magic, the six entries, then the info bar text (MOD_SYSOPT_BAR_TEXT;
 // the info bar reads an ASCII comma as a Shift-JIS lead byte: the
 // full-width comma 81 43 instead)
 __asm__(".text\n"
@@ -83,6 +86,9 @@ __asm__(".text\n"
         ".word ModSysOptBox\n"
         ".word ModSysOptInput\n"
         ".word ModSysOptSound\n"
+        ".word ModBestMain\n" // the Bestiary row (bestiary_menu.h)
+        ".word ModBestInput\n"
+        ".word ModBestDraw\n"
         ".asciz \"Boss versions\\201\\103balance\\201\\103dub\\201\\103ending\\201\\103text\"\n"
         ".align 2\n");
 
@@ -486,3 +492,5 @@ void ModSysOptInput(s32* nav, u8 nOptions, u32 type) {
         g_pads[0].repeat = 0;
     }
 }
+
+#include "bestiary_menu.h"
