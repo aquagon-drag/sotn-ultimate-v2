@@ -84,6 +84,10 @@ for p in BEST_LIB_DESC:D_us_80180FB4 BEST_LIB_DESC_S:g_ModLibDesc \
     BEST_DEFS="$BEST_DEFS -D${p%%:*}=${a}u"
 done
 
+# "Bestiary"'s width in the RT 8 px font (64: no RT font in this build)
+BEST_RT_W=$(cd mods/sotn-ultimate/tools && python3 -c "import text_rt as t; print(t.rt8_width(t.to_s('Bestiary')) if t.rt8_on() else 64)")
+BEST_DEFS="$BEST_DEFS -DBEST_RT_W=$BEST_RT_W"
+
 VERSION=us mipsel-linux-gnu-cpp $BEST_DEFS -Iinclude -Iinclude/psxsdk -Isrc/dra -lang-c \
     -undef -Wall -fno-builtin -Dmips -D__GNUC__=2 -D__OPTIMIZE__ -D__mips__ -D__mips \
     -Dpsx -D__psx__ -D__psx -D_PSYQ -D__EXTENSIONS__ -D_MIPSEL -D_LANGUAGE_C \

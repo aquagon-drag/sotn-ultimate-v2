@@ -65,9 +65,11 @@ extern s32 g_Cd[]; // CdThing (src/dra/dra.h): [4] D_80137F70, [5] F74,
 static const char g_BestName[] = _S("Bestiary");
 static const char g_BestNone[] = _S("--------------");
 static const char g_BestNo[] = _S("No.");
+// (an _S string ends with 0xFF; C adds the 0 only at the end: each needs
+// its own)
 static const char g_BestLbl[] =
-    _S("LV") _S("HP") _S("Exp") _S("Drop Items") _S("Strong VS.") _S("Immune")
-        _S("Weak VS.") _S("Absorb") _S("None") _S("????????");
+    _S("LV") "\0" _S("HP") "\0" _S("Exp") "\0" _S("Drop Items") "\0" _S(
+        "Strong VS.") "\0" _S("Immune") "\0" _S("Weak VS.") "\0" _S("Absorb") "\0" _S("None") "\0" _S("????????");
 static const char g_BestEl[] = _S("HOLDRKFIRTHUICEH2OSTNPSNCURCUTHIT");
 // their element bits (1 << n): HOLY DARK FIRE THUNDER ICE WATER STONE
 // POISON CURSE CUT HIT
@@ -89,22 +91,23 @@ static s32 g_BestCur = 0;
 static s32 g_BestTop = 0;
 
 #define BEST_RT() (*(u8*)&MOD_DUB_STATE->textPack == MOD_TEXT_PACK_RT)
-// a menu string's width: the RT 8 px font's advances under Retrans
-static s32 BestWidth(const u8* s) {
-    const u8* w = (const u8*)(MOD_RT_FONT_END - MOD_RT8_CHARS);
-    s32 n = 0;
-
-    for (; *s != 0xFF; s++) {
-        n += (BEST_RT() && *s < MOD_RT8_CHARS) ? w[*s] : 8;
-    }
-    return n;
-}
+// "Bestiary"'s width: the RT 8 px font's under Retrans (BEST_RT_W,
+// build_sysopt.sh from text_rt.py)
+#define BEST_NAME_W (BEST_RT() ? BEST_RT_W : 64)
 
 void ModBestMain(MenuContext* ctx, s32 x, s32 y) {
+    MenuContext* box = &g_Menus[MENU_DG_FAMILIARS];
+
     func_800F8754(ctx, x, y);
     D_8013784C = 0;
+    // the menu was closed (Start) on the Bestiary: its window is still up
+    // when the menu opens again (no exit step hides it), and its page
+    if (g_MenuStep == MENU_STEP_OPENED && (box->unk1C == 0 || box->unk1C == 3)) {
+        box->unk1C = 2;
+        g_BestPage = 0;
+    }
     // centred in the 76 px box, as the other rows
-    MenuDrawStr(g_BestName, x + 38 - BestWidth(g_BestName) / 2, y + 84, ctx);
+    MenuDrawStr(g_BestName, x + 38 - BEST_NAME_W / 2, y + 84, ctx);
 }
 
 void ModBestInput(s32* nav, u8 nOptions, u32 type) {
@@ -450,7 +453,7 @@ void ModBestDraw(MenuContext* ctx) {
     if (ctx->unk1C == 0) {
         BestInput(); // (fully open)
     }
-    MenuDrawStr(g_BestName, 180 - BestWidth(g_BestName) / 2, 36, ctx);
+    MenuDrawStr(g_BestName, 180 - BEST_NAME_W / 2, 36, ctx);
     for (i = 0; i < BEST_ROWS * 2; i++) {
         e = g_BestTop * 2 + i;
         if (e >= BEST_CELLS) {
