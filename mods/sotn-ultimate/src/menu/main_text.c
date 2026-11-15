@@ -137,7 +137,7 @@ static s32 MtRtLine(const char* str, u8* pix, s32 stride) {
     MT_RT_LINE = pix;
     w = MT_RT_TEXT(line, stride);
     MT_RT_LINE = old;
-    return w ? (w - 1 + 1) / 2 : 0;
+    return w / 2;
 }
 
 // src/st/e_collect.h EntityRelicOrb, step 6 (US): pre + name ("Obtained "
@@ -181,19 +181,15 @@ void ModTxtBox(const char* str, u8* pix, s32 width) {
     u8* chPix = pix;
 
     if (MT_RT()) {
-        if (MtRtLine(str, pix, width >> 1)) {
-            while ((u8)*str >= 2) {
-                str++;
-            }
-            if (*str != 1 || MtRtLine(str + 1, &pix[width * 8], width >> 1)) {
-                return;
-            }
+        // (a line with a character the font lacks stays blank)
+        MtRtLine(str, pix, width >> 1);
+        while ((u8)*str >= 2) {
+            str++;
         }
-        // (a character the font lacks: the US way)
-        for (xOffset = 0; xOffset < width * 16; xOffset++) {
-            pix[xOffset] = 0;
+        if (*str == 1) {
+            MtRtLine(str + 1, &pix[width * 8], width >> 1);
         }
-        xOffset = 0;
+        return;
     }
     while (*str) {
         if (*str == 1) {
