@@ -305,7 +305,11 @@ def foreign_refs(ram, syms, ents, segs, dra_len):
     img = ram.read(DRA_BASE, dra_len)
     n = len(img) // 4
     words = struct.unpack("<%dI" % n, img[:4 * n])
-    out = [DRA_BASE + 4 * i for i, v in enumerate(words) if inside(v) and DRA_BASE + 4 * i not in slots]
+    # src/dra/d_3B0D4.c: palettes (u16 colours, D_800DB0D4..), not
+    # pointers: two colours can read as an address in a segment
+    pal = (syms["D_800DB0D4"], syms["D_800DB1F4"] + 0x1C0)  # (to 0x3B3B4)
+    out = [DRA_BASE + 4 * i for i, v in enumerate(words) if inside(v) and DRA_BASE + 4 * i not in slots
+           and not pal[0] <= DRA_BASE + 4 * i < pal[1]]
     out += [a for a in text_rt.code_refs(img) if inside(a)]
     return out
 
