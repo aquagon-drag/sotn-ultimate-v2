@@ -47,7 +47,9 @@ static void ModRtCutChar(u8 ch) {
         rect.w = MOD_RT_CUT_ROW / 2;
         rect.h = 12;
         LoadImage(&rect, (u_long*)(MOD_RT_CUT_BUF + 2 * MOD_RT_CUT_ROW));
-        DrawSync(0);
+        // (DrawSync: main's, config/symbols.us.txt; the stages' link
+        // lists do not name it) the strip is cleared for the next byte
+        ((int (*)(int))0x8001290C)(0);
     }
     *(u8**)0x8013794C = old;
 }
