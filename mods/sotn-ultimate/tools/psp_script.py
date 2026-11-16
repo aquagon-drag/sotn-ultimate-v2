@@ -76,6 +76,10 @@ KEEP_JSON = os.path.join(WORK, "keep_ps1.json")
 EDITS = os.path.join(WORK, "edits.json")  # check_stage_data.py allows these
 DUB_JSON = os.path.join(ROOT, "build/us/psp_dub/dub.json")
 MAX_COLS = 21
+# the overlays whose cutscenes draw the retranslation's 12 px font
+# (src/st/cutscene_mod_rt.h in their character branch): only these get an
+# RT copy (Script = Retrans; rt_script.py's text, timed for the JP voices)
+RT_OVERLAYS = {"lib"}
 # overlay -> (columns, lines per box) where the box differs (see above)
 BOX_LIMITS = {"no4": (22, 3)}
 
@@ -256,7 +260,7 @@ def assemble(toks):
     for t in toks:
         op = t[0]
         if op == "TEXT":
-            out += list(t[1].encode("ascii"))
+            out += list(t[1].encode("latin-1"))
         elif op == "BYTE":
             out.append(t[1])
         elif op == "SCRIPT_SWITCH":
@@ -874,9 +878,26 @@ def jp_lines(toks, dur, target):
     return out
 
 
-def transplant(part, psp, dub, report, ovl=None):
+def rt_line_bytes(lines):
+    """an RT copy's lines: each character as the bytes ModRtText reads
+    (text_rt.to_bios: ASCII letters / digits / space, Shift-JIS punctuation),
+    as latin-1 characters; a character's waits go with its first byte"""
+    import text_rt
+    out = []
+    for ln in lines:
+        nl = []
+        for ch, ws in ln:
+            b = text_rt.to_bios(ch).decode("latin-1")
+            nl.append((b[0], ws))
+            nl += [(c, []) for c in b[1:]]
+        out.append(nl)
+    return out
+
+
+def transplant(part, psp, dub, report, ovl=None, rt=False):
     """plan for one script part: [("tok", index) | ("seg", ...) | ("app", ...)],
-    replaced ids, ids with no PSP text"""
+    replaced ids, ids with no PSP text. rt: psp is the retranslation's lines
+    (rt_script.py, by patched JP id): its line breaks kept, no APPEND"""
     plan, replaced, missing = [], [], []
     cols, max_lines = box_limits(ovl)
     i = 0
@@ -897,14 +918,21 @@ def transplant(part, psp, dub, report, ovl=None):
             plan += [("tok", n) for n in range(i, j)]  # a voice with no text
             i = j
             continue
-        sid = TEXT_OVERRIDE.get(vid, vid - 2)
+        if rt:
+            import rt_script
+            sid = rt_script.RT_ID.get(vid, vid - 2)
+        else:
+            sid = TEXT_OVERRIDE.get(vid, vid - 2)
         if sid not in psp:
             missing.append(vid)
             plan += [("tok", n) for n in range(i, j)]
             i = j
             continue
         lines, end_waits = psp_lines(pick(psp, sid))
-        lines = wrap(lines, cols, max_lines)
+        if rt:
+            lines = rt_line_bytes(lines)
+        else:
+            lines = wrap(lines, cols, max_lines)
         # speed: the PS1 line's, by characters typed
         sp, cnt = 2, Counter()
         for _, x in seg:
@@ -926,7 +954,7 @@ def transplant(part, psp, dub, report, ovl=None):
             "%.1fs" % (voice / 60) if voice else "-",
             "".join(x[1] for _, x in seg if x[0] == "TEXT")[:24],
             " / ".join("".join(c for c, _ in ln) for ln in lines)))
-        if vid in APPEND:
+        if vid in APPEND and not rt:
             psp_id, define, who = APPEND[vid]
             l2, w2 = psp_lines(pick(psp, psp_id))
             l2 = wrap(l2, cols)
@@ -1042,9 +1070,11 @@ def main():
             jdur[vid] = min(jdur[vid], sec * 60)
     report, patches, keep, edits, spills = [], [], set(), {}, {}
     maxcol = 0
+    import rt_script
     for ovl, (retail_rel, mapname, scripts) in OVERLAYS.items():
         retail = open(os.path.join(ROOT, "disks/us", retail_rel), "rb").read()
         psp = psp_segments(os.path.join(PSP_BIN, ovl + ".bin"))
+        rtd = rt_script.rt_lines_for(retail_rel) if ovl in RT_OVERLAYS else None
         for sc in scripts:
             if "c" in sc:
                 toks = read_c_array(sc["c"], sc["sym"])
@@ -1091,37 +1121,7 @@ def main():
                 report.append("  PS1 only: " + why)
                 keep.update(voiced)
                 continue
-            # the copy: its parts in a row; jump targets inside the script
-            # move with the token they hit, ("S", offset in the copy)
-            old_map, starts, o, part_off = {}, [], 0, 0
-            for part, newt in rendered:
-                old_at, q = [], 0
-                for t in part:
-                    old_at.append(q)
-                    q += tok_size(t)
-                starts.append((part_off, o))
-                for t, idx in newt:
-                    if idx is not None and off is not None:
-                        old_map[BASE + off + part_off + old_at[idx]] = ("S", o)
-                    o += tok_size(t)
-                part_off += q
-            lo = BASE + off if off is not None else 0
-            hi = lo + len(blob) if off is not None else 0
-            fixed = []
-            for part, newt in rendered:
-                for t, _ in newt:
-                    if t[0] in ("SCRIPT_SWITCH", "SCRIPT_UNKNOWN_15"):
-                        assert off is not None, (ovl, label, "jump in a C array script")
-                        head = 2 if t[0] == "SCRIPT_SWITCH" else 1
-                        tg = []
-                        for a_ in t[head:]:
-                            # (a jump out of the copy would play retail text)
-                            assert lo <= a_ < hi, (ovl, label, "jump out of the script", hex(a_))
-                            assert a_ in old_map, (ovl, "jump into replaced text", hex(a_))
-                            a_ = old_map[a_]
-                            tg.append(a_)
-                        t = tuple(list(t[:head]) + tg)
-                    fixed.append(t)
+            fixed, starts = copy_tokens(rendered, off, blob, ovl, label)
             # boxes held until the English voice ends (as the JP copies)
             leads = flag_leads(toks)
             fixed, ents, held = jp_adjust(fixed, [so for _, so in starts], dub, False, leads)
@@ -1157,6 +1157,28 @@ def main():
                     rec["jp_entries"] = [[po, js + so] for (po, _), so in zip(starts, jents)]
                     sp["jp_size"] = js + jn
                 report.append("  JP copy: %d bytes, %d lines retimed%s" % (jn, len(jchanged), keeps))
+            if rtd is not None and "c" not in sc:
+                # Script = Retrans: the retranslation's lines on the PS1
+                # skeleton (a missing one: the PSP's), timed for the JP voices
+                rrend, rmiss = [], []
+                for part in parts:
+                    plan, _, miss = transplant(part, rtd, jdur, [], ovl, rt=True)
+                    if miss:
+                        plan, _, _ = transplant(part, psp, jdur, [], ovl)  # (whole part)
+                        rmiss += miss
+                    rrend.append((part, render(part, plan, 0, extra_ids)))
+                rfixed, rstarts = copy_tokens(rrend, off, blob, ovl, label)
+                rt_t, rents, rchanged = jp_adjust(rfixed, [so for _, so in rstarts], jdur, True, leads)
+                rec = sp["scripts"][-1]
+                rec["rt_tokens"] = rt_t
+                rn = len(assemble(resolve(rt_t, BASE)))
+                rs = sp.get("rt_size", 0)
+                rec["rt_at"] = rs
+                rec["rt_entries"] = [[po, rs + so] for (po, _), so in zip(rstarts, rents)]
+                sp["rt_size"] = rs + rn
+                report.append("  RT copy: %d bytes, %d lines retimed%s" % (
+                    rn, len(rchanged), ", PSP text for " + " ".join("%X" % v for v in rmiss)
+                    if rmiss else ""))
                 for vid, v, up, typed in jp_lines(jt, jdur, offset_target(jt)):
                     report.append("    JP %X voice %.1fs typing %.1fs box %s%s" % (
                         vid, v / 60, typed / 60, "held" if up >= INF else "%.1fs" % (up / 60),
@@ -1180,6 +1202,43 @@ def main():
     for line in report:
         if "PS1 only" in line:
             print(line)
+
+
+def copy_tokens(rendered, off, blob, ovl, label):
+    """a copy's tokens from its rendered parts, and its parts' starts
+    [(retail part offset, copy offset)]"""
+    # the copy: its parts in a row; jump targets inside the script
+    # move with the token they hit, ("S", offset in the copy)
+    old_map, starts, o, part_off = {}, [], 0, 0
+    for part, newt in rendered:
+        old_at, q = [], 0
+        for t in part:
+            old_at.append(q)
+            q += tok_size(t)
+        starts.append((part_off, o))
+        for t, idx in newt:
+            if idx is not None and off is not None:
+                old_map[BASE + off + part_off + old_at[idx]] = ("S", o)
+            o += tok_size(t)
+        part_off += q
+    lo = BASE + off if off is not None else 0
+    hi = lo + len(blob) if off is not None else 0
+    fixed = []
+    for part, newt in rendered:
+        for t, _ in newt:
+            if t[0] in ("SCRIPT_SWITCH", "SCRIPT_UNKNOWN_15"):
+                assert off is not None, (ovl, label, "jump in a C array script")
+                head = 2 if t[0] == "SCRIPT_SWITCH" else 1
+                tg = []
+                for a_ in t[head:]:
+                    # (a jump out of the copy would play retail text)
+                    assert lo <= a_ < hi, (ovl, label, "jump out of the script", hex(a_))
+                    assert a_ in old_map, (ovl, "jump into replaced text", hex(a_))
+                    a_ = old_map[a_]
+                    tg.append(a_)
+                t = tuple(list(t[:head]) + tg)
+            fixed.append(t)
+    return fixed, starts
 
 
 def resolve(toks, base):
@@ -1210,6 +1269,16 @@ HDR_FN_JP = """static u8* ModPspScript(u8* script) {
     }
     return script;
 }
+"""
+HDR_RT = """    u32 i;
+
+    if (*(u8*)&MOD_DUB_STATE->textPack == MOD_TEXT_PACK_RT) {
+        for (i = 0; i < sizeof(g_ModRtMap) / sizeof(g_ModRtMap[0]); i++) {
+            if (script == g_ModRtMap[i][0]) {
+                return g_ModRtMap[i][1];
+            }
+        }
+    }
 """
 HDR_FN = """static u8* ModPspScript(u8* script) {
     u32 i;
@@ -1279,9 +1348,22 @@ def write_spill_headers(spills):
                 for sc in sp["scripts"]:
                     for po, so in sc.get("jp_entries", []):
                         s += "    {(u8*)0x%08X, g_ModJpSpill + %d},\n" % (BASE + sc["off"] + po, so)
-                s += "};\n" + HDR_FN_JP
-            else:
-                s += HDR_FN
+                s += "};\n"
+            if sp.get("rt_size"):
+                s += ("// Script = Retrans: the retranslation's text (rt_script.py), timed for\n"
+                      "// the JP voices, drawn in its 12 px font (cutscene_mod_rt.h); filled by\n"
+                      "// --apply too\n"
+                      "#define MOD_RT_CUTSCENE\n"
+                      "u8 g_ModRtSpill[%d] __attribute__((section(\".rodata\"))) = {0};\n"
+                      "static u8* const g_ModRtMap[][2] = {\n" % sp["rt_size"])
+                for sc in sp["scripts"]:
+                    for po, so in sc.get("rt_entries", []):
+                        s += "    {(u8*)0x%08X, g_ModRtSpill + %d},\n" % (BASE + sc["off"] + po, so)
+                s += "};\n"
+            fn = HDR_FN_JP if sp.get("jp_size") else HDR_FN
+            if sp.get("rt_size"):
+                fn = fn.replace("    u32 i;\n\n", HDR_RT, 1)
+            s += fn
         if sp:
             s = s.replace("#define MOD_PSP_SCRIPT\n",
                           "#if defined(MOD_SATURN) && defined(VERSION_US)\n"
@@ -1338,6 +1420,8 @@ def apply(off, check=False):
         m = re.search(r"0x([0-9a-f]+)\s+g_ModPspSpill\n", open(os.path.join(ROOT, p["map"])).read())
         assert m, "%s: g_ModPspSpill not linked (mod_psp_script.h?)" % p["map"]
         mj = re.search(r"0x([0-9a-f]+)\s+g_ModJpSpill\n", open(os.path.join(ROOT, p["map"])).read())
+        mr = re.search(r"0x([0-9a-f]+)\s+g_ModRtSpill\n", open(os.path.join(ROOT, p["map"])).read())
+        assert mr or not p["spill"].get("rt_size"), "%s: g_ModRtSpill not linked" % p["map"]
         assert mj or not p["spill"].get("jp_size"), "%s: g_ModJpSpill not linked" % p["map"]
         changed = False
         for sc in p["spill"]["scripts"]:
@@ -1355,6 +1439,19 @@ def apply(off, check=False):
                     b[o:o + len(code)] = code
                     changed = True
                 jcount += 1
+            if sc.get("rt_tokens"):
+                # Script = Retrans's copy
+                addr = int(mr[1], 16) + sc["rt_at"]
+                toks = [tuple(tuple(a) if isinstance(a, list) else a for a in t)
+                        for t in sc["rt_tokens"]]
+                code = assemble(resolve(toks, addr))
+                assert sc["rt_at"] + len(code) <= p["spill"]["rt_size"]
+                o = addr - BASE
+                if bytes(b[o:o + len(code)]) != code:
+                    if check:
+                        sys.exit("psp_script: %s at 0x%X: the RT copy is not filled" % (p["bin"], o))
+                    b[o:o + len(code)] = code
+                    changed = True
             old = bytes.fromhex(sc["old"])
             if bytes(b[sc["off"]:sc["off"] + len(old)]) != old:
                 sys.exit("psp_script: %s at 0x%X: the retail script changed" % (p["bin"], sc["off"]))

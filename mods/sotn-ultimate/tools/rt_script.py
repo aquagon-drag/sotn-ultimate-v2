@@ -89,6 +89,16 @@ def rt_segments(b, jp):
     return {k: max(v, key=lambda c: c[0])[1] for k, v in found.items()}
 
 
+def rt_lines_for(retail_rel):
+    """psp_script.py's RT copies: {patched JP voice id: [(score, items)]}
+    of the overlay, or None without the patched disc's files"""
+    b = jp_overlay(retail_rel)
+    if b is None or not os.path.exists(text_rt.JP_DRA):
+        return None
+    jp = text_rt.Jp(open(text_rt.JP_DRA, "rb").read())
+    return {k: [(0, v)] for k, v in rt_segments(b, jp).items()}
+
+
 def lines_of(items):
     out, cur = [], ""
     for it in items:

@@ -49,6 +49,8 @@ s32 g_IsCutsceneDone;
 #include "../cutscene_scale_avatar.h"
 
 extern u8 cutscene_data[];
+#include "../cutscene_mod_rt.h"
+
 void EntityCutscene(Entity* self) {
     RECT rect;
     Primitive* prim;
@@ -352,6 +354,12 @@ void EntityCutscene(Entity* self) {
             }
             break; // This breaks the big while-loop!
         }
+#if defined(MOD_RT_CUTSCENE)
+        if (MOD_RT_CUT_ON()) {
+            ModRtCutChar(nextChar); // (cutscene_mod_rt.h)
+            break;
+        }
+#endif
         if (nextChar == 0x20) {
             g_Dialogue.nextCharX += 2;
             return;
