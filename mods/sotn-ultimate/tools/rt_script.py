@@ -27,6 +27,14 @@ ROOT = ps.ROOT
 JPRE = os.path.join(ROOT, "disks/jpre")
 WORK = os.path.join(ROOT, "build/us/rt_script")
 REPORT = os.path.join(WORK, "report.txt")
+# PS1 voice id -> the patched JP script's PLAY_SOUND id where it is not
+# PS1 - 2: DRE's Succubus line and BO6's swapped branches as the PSP's
+# (psp_script.py TEXT_OVERRIDE), TOP's 0x3F0 (Richter, "What have I been
+# doing...?": JP 0x3F6; Gerardo checked both in the patched game). CEN's
+# Maria lines follow PS1 - 2 (the PSP's restructure is the PSP's own).
+# Voices with no text in the scripts: DRE 0x392 (subtitled later), LIB
+# 0x3B9, BO2 0x394 (laughter), BO6 0x3E1 (Richter's death scream)
+RT_ID = {0x38B: 0x38A, 0x3D4: 0x3D4, 0x3D6: 0x3D2, 0x3F0: 0x3F6}
 # the dialogue's text strip: 192 px (psp_script.py MAX_COLS: 8 px cells
 # from x = 8, the box ends at 248)
 LINE_PX = 192
@@ -38,12 +46,12 @@ def jp_overlay(retail_rel):
 
 
 def rt_segments(b, jp):
-    """PS1 voice id -> [items], items: ('T', str) / ('BR',) / ('W', n), from
+    """patched JP voice id -> [items], items: ('T', str) / ('BR',) / ('W', n), from
     the patched JP overlay b (ENC12 text, DTE through jp, a text_rt.Jp)"""
     found = {}
     for m in re.finditer(rb"\x09([\x30-\x53])(.)", b, re.S):
-        sid = ((m.group(1)[0] << 4) | m.group(2)[0]) + 2
-        if not (ps.VOICE_LO <= sid <= ps.VOICE_HI):
+        sid = (m.group(1)[0] << 4) | m.group(2)[0]
+        if not (ps.VOICE_LO - 2 <= sid <= ps.VOICE_HI):
             continue
         i, items, bad = m.end(), [], False
         while i < len(b):
@@ -117,11 +125,12 @@ def main():
             rep.append("%s @0x%X voices %s" % (ovl, off, " ".join("%X" % i for i in ids)))
             for sid in ids:
                 total += 1
-                if sid not in rt:
+                jid = RT_ID.get(sid, sid - 2)
+                if jid not in rt:
                     missing.append("%s %X" % (ovl, sid))
                     rep.append("  %X  (no retranslated line)" % sid)
                     continue
-                ls = lines_of(rt[sid])
+                ls = lines_of(rt[jid])
                 ws = [px(l) for l in ls]
                 widest = max(widest, max(ws))
                 rep.append("  %X  %d lines, widest %d px%s" % (
