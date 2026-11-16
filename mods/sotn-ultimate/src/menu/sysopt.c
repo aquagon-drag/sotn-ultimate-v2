@@ -444,11 +444,14 @@ void ModSysOptBox(MenuContext* ctx, s32 cursorIdx, s32 x, s32 y, s32 w, s32 h,
     // a text pack on its way: "Loading..." in the row instead of the System
     // list's half-applied names (MenuSystemDraw draws nothing more:
     // src/dra/menu.c)
-    if (MOD_DUB_STATE->textPack) {
-        func_800F5E68(ctx, cursorIdx, x, y, w, h, yGap, bColorMode);
+    {
+        const char* s = _S("Loading...");
+        if (MOD_DUB_STATE->textPack) {
+            func_800F5E68(ctx, cursorIdx, x, y, w, h, yGap, bColorMode);
+            s = SYSOPT_NAME();
+        }
+        MenuDrawStr(s, 0x20, 0x30 + ROW * 0x10, ctx);
     }
-    MenuDrawStr(MOD_DUB_STATE->textPack ? SYSOPT_NAME() : _S("Loading..."),
-                0x20, 0x30 + ROW * 0x10, ctx);
 }
 
 void ModSysOptSound(MenuContext* ctx) {
