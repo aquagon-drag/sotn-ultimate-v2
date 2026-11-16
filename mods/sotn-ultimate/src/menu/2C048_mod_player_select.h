@@ -204,11 +204,13 @@ void ModTextSelDub(void) {
         return;
     }
     MOD_DUB_STATE->textPack = 0;
-    if (((tag & ~1) == MOD_TEXT_TAG(MOD_TEXT_PACK_PS1) ||
-         ModTextSelRun(MOD_TEXT_PACK_RESTORE)) &&
-        ModTextSelRun(pack)) {
-        MOD_DUB_STATE->textPack = MOD_TEXT_TAG(pack);
+    if ((tag & ~1) == MOD_TEXT_TAG(MOD_TEXT_PACK_PS1) ||
+        ModTextSelRun(MOD_TEXT_PACK_RESTORE)) {
+        ModTextSelRun(pack);
     }
+    // set even when a chunk failed: in game a 0 tag means "the System popup
+    // is applying a pack" and holds the pause menu open (src/dra/menu.c)
+    MOD_DUB_STATE->textPack = MOD_TEXT_TAG(pack);
 }
 // (Script = Retrans: ModTextReady)
 #define MOD_TEXT_SEL_RT() (MOD_TEXT_RT_READY && MOD_SCRIPT_RETRANS())

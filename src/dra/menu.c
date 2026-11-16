@@ -1783,6 +1783,12 @@ void MenuSystemDraw(MenuContext* ctx) {
 
     MOD_SYSOPT_BOX(ctx, g_MenuNavigation.cursorSettings, 30, 46, Width, 12, 4,
                    g_MenuStep == MENU_STEP_SYSTEM);
+#if defined(MOD_ULTIMATE_MENU)
+    // SOTN Ultimate: a text pack on its way (the box drew "Loading...")
+    if (!MOD_DUB_STATE->textPack) {
+        return;
+    }
+#endif
 
     MenuDrawStr(g_MenuStr[16], 0x20, y, ctx);
     y += 0x10;
@@ -3677,7 +3683,14 @@ void MenuHandle(void) {
 #endif
     D_80137614 = 1;
     func_800F97DC();
-    if (g_MenuStep >= MENU_STEP_OPENED && g_pads[0].tapped & PAD_START) {
+    if (g_MenuStep >= MENU_STEP_OPENED && g_pads[0].tapped & PAD_START
+#if defined(MOD_ULTIMATE_MENU)
+        // SOTN Ultimate: not while the System popup applies a text pack (its
+        // tag 0; SEL always leaves one set: mods/sotn-ultimate/src/menu/
+        // sysopt.c, 2C048_mod_player_select.h)
+        && MOD_DUB_STATE->textPack
+#endif
+    ) {
         if (CheckIfAllButtonsAreAssigned()) {
             g_MenuStep = MENU_STEP_EXIT_BEGIN;
         } else {
