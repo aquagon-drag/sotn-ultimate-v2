@@ -338,16 +338,17 @@ static void SysOptText(void) {
         // the menu open, below and src/dra/menu.c)
         if (g_TextFails >= 4) {
             MOD_DUB_STATE->textPack = MOD_TEXT_TAG(want);
+            return;
         }
-        if (MOD_DUB_STATE->textPack == MOD_TEXT_TAG(want) ||
-            g_CdStep != CdStep_None || g_IsUsingCd) {
+        if (tag == MOD_TEXT_TAG(want) || g_CdStep != CdStep_None ||
+            g_IsUsingCd) {
             return;
         }
         g_TextPack = want;
         g_TextNext = 0;
+        // (the tags of PS1 (0) and PSP (1) differ in bit 0 only)
         if (g_TextPack != MOD_TEXT_PACK_RT &&
-            tag != MOD_TEXT_TAG(MOD_TEXT_PACK_PS1) &&
-            tag != MOD_TEXT_TAG(MOD_TEXT_PACK_PSP)) {
+            (tag & ~1) != MOD_TEXT_TAG(MOD_TEXT_PACK_PS1)) {
             // from the retranslation (or half applied): restore first
             g_TextNext = g_TextPack + 1;
             g_TextPack = MOD_TEXT_PACK_RESTORE;
@@ -440,14 +441,14 @@ void ModSysOptBox(MenuContext* ctx, s32 cursorIdx, s32 x, s32 y, s32 w, s32 h,
         // menu is closing, Start included): the banks follow
         SysOptBanks();
     }
-    // a text pack on its way: "Loading..." instead of the System list's
-    // half-applied names (MenuSystemDraw draws nothing more: src/dra/menu.c)
-    if (!MOD_DUB_STATE->textPack) {
-        MenuDrawStr(_S("Loading..."), 0x20, 0x30, ctx);
-        return;
+    // a text pack on its way: "Loading..." in the row instead of the System
+    // list's half-applied names (MenuSystemDraw draws nothing more:
+    // src/dra/menu.c)
+    if (MOD_DUB_STATE->textPack) {
+        func_800F5E68(ctx, cursorIdx, x, y, w, h, yGap, bColorMode);
     }
-    func_800F5E68(ctx, cursorIdx, x, y, w, h, yGap, bColorMode);
-    MenuDrawStr(SYSOPT_NAME(), 0x20, 0x30 + ROW * 0x10, ctx);
+    MenuDrawStr(MOD_DUB_STATE->textPack ? SYSOPT_NAME() : _S("Loading..."),
+                0x20, 0x30 + ROW * 0x10, ctx);
 }
 
 void ModSysOptSound(MenuContext* ctx) {
@@ -485,11 +486,6 @@ void ModSysOptInput(s32* nav, u8 nOptions, u32 type) {
 
     if (*nav > ROW) {
         *nav = ROW; // (a save from the build with four rows here)
-    }
-    // (a text pack on its way: the list waits, Triangle too)
-    if (!MOD_DUB_STATE->textPack) {
-        g_pads[0].tapped = 0;
-        g_pads[0].repeat = 0;
     }
     MenuHandleCursorInput(nav, ROW + 1, type);
     if (*nav == ROW && (g_pads[0].tapped & PAD_CROSS)) {
