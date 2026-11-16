@@ -16,6 +16,12 @@ static void DrawCutsceneActorName(u16 actorIndex, Entity* self) {
     u16 chCount;
     const char* actorName;
     char ch;
+#if defined(MOD_RT_CUTSCENE)
+    // SOTN Ultimate, Script = Retrans: the retranslation's 8 px font (its
+    // tiles from MOD_RT8_TILE0 and advances in the RT font room, as the menus)
+    s32 rt = *(u8*)&MOD_DUB_STATE->textPack == MOD_TEXT_PACK_RT;
+    const u8* rtW = (const u8*)(MOD_RT_FONT_END - MOD_RT8_CHARS);
+#endif
 
     actorName = actor_names[DRAW_NAME_ACTOR_INDEX];
     chCount = 0;
@@ -47,6 +53,26 @@ static void DrawCutsceneActorName(u16 actorIndex, Entity* self) {
     x = 0x38;
     while (prim != NULL) {
         ch = *actorName++;
+#if defined(MOD_RT_CUTSCENE)
+        if (rt && (u8)ch < MOD_RT8_CHARS) {
+            if (ch != CH(' ')) {
+                prim->type = PRIM_SPRT;
+                prim->tpage = 0x1E;
+                prim->clut = PAL_UNK_196;
+                prim->u0 = ((ch + MOD_RT8_TILE0) & 0x0F) * FONT_W;
+                prim->v0 = ((ch + MOD_RT8_TILE0) & 0xF0) / (FONT_H / 4);
+                prim->v1 = FONT_H;
+                prim->u1 = FONT_W;
+                prim->priority = 0x1FF;
+                prim->drawMode = DRAW_HIDE;
+                prim->x0 = x;
+                prim->y0 = g_Dialogue.startY + 6;
+                prim = prim->next;
+            }
+            x += rtW[(u8)ch];
+            continue;
+        }
+#endif
         if (ch == CH(' ')) {
             x += FONT_SPACE;
         } else {
