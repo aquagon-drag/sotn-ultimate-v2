@@ -35,6 +35,7 @@
 #define CdReadyCallback ((void* (*)(void*))SEL_CD_READY_CB)
 #define CdDataCallback ((void* (*)(void*))SEL_CD_DATA_CB)
 #define MOD_TEXT_PROTOS
+#define MOD_TEXT_FN // (ModTextChunkOk is here, global: 2C048 calls it too)
 #include "text_pack.h"
 void ModTextSelDub(void);             // 2C048_mod_player_select.h
 extern const s32 g_ModTextRtCdIdx;   // SEL's rodata (check_text_packs.py)

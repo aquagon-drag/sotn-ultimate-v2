@@ -173,6 +173,7 @@ static const ModJpDubTable g_ModJpDubTable MOD_RO = {
 // functions and ModTextSelDub are global: ModTextReady calls them from the
 // dead config copy (src/st/sel/mod_text_cd.inc)
 #define MOD_TEXT_FN
+#define MOD_TEXT_SEL_TEXT // (ModTextChunkOk: sel_text_cd.c's)
 #include "text_pack.h"
 // where the chunks are (a word, so check_text_packs.py reads what runs)
 const u8* const g_ModTextSelChunk __attribute__((section(".rodata"))) =

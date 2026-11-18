@@ -71,12 +71,13 @@ typedef char ModTextLayout[sizeof(ModDubState) == 4096 &&
         g_CdStep = CdStep_None;                                                \
     } while (0)
 
-#if defined(MOD_TEXT_PROTOS) // (SEL's reader: sel_text_cd.c)
+#if defined(MOD_TEXT_SEL_TEXT) // (SEL: ModTextChunkOk is its reader's)
 s32 ModTextChunkOk(const u8* c, s32 i);
-void ModTextRun(const u8* c, s32 pack);
 #else
 // the chunk's header and sum are right and it is chunk i (a buffer the CD
-// did not fill, or that something else wrote, is not applied)
+// did not fill, or that something else wrote, is not applied). SEL's copy
+// is in its reader (sel_text_cd.c, in the dead config copy: SEL's .text is
+// full)
 MOD_TEXT_FN s32 ModTextChunkOk(const u8* c, s32 i) {
     const u16* h = (const u16*)c;
     const u16* w;
@@ -92,6 +93,11 @@ MOD_TEXT_FN s32 ModTextChunkOk(const u8* c, s32 i) {
     }
     return (u16)sum == h[3];
 }
+#endif
+
+#if defined(MOD_TEXT_PROTOS) // (SEL's reader: sel_text_cd.c)
+void ModTextRun(const u8* c, s32 pack);
+#else
 
 // applies one pack's records found in this chunk
 MOD_TEXT_FN void ModTextRun(const u8* c, s32 pack) {
