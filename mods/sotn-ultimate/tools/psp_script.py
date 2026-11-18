@@ -1333,10 +1333,15 @@ HDR_RT = """    u32 i;
 """
 # RT_EXT (SEL): the copy is in main.exe's free 8 KB; ModRtExt(-1) puts it at
 # MOD_RT_EXT_RUN before it plays (rt_ext.c)
-HDR_RT_EXT = HDR_RT.replace("""                g_ModRtCutScript = 1;
-""", """                g_ModRtCutScript = 1;
-                ((void (*)(s32, s32, s32, s32))MOD_RT_EXT_ADDR)(-1, 0, 0, 0);
-""")
+HDR_RT_EXT = """    u32 i;
+
+    g_ModRtCutScript = 0;
+    if (*(u8*)&MOD_DUB_STATE->textPack == MOD_TEXT_PACK_RT && (%s)) {
+        g_ModRtCutScript = 1;
+        ((void (*)(s32, void*, void*))MOD_RT_EXT_ADDR)(MOD_RT_EXT_SCRIPT, NULL, NULL);
+        return (u8*)MOD_RT_EXT_RUN;
+    }
+"""
 # the RT copies' header lines (before g_ModRtMap)
 HDR_RT_DEFS = ("// Script = Retrans: the retranslation's text (rt_script.py), timed for\n"
                "// the JP voices, drawn in its 12 px font (cutscene_mod_rt.h) while\n"
@@ -1437,18 +1442,18 @@ def write_spill_headers(spills):
                         s += "    {(u8*)0x%08X, g_ModRtSpill + %d},\n" % (BASE + sc["off"] + po, so)
                 s += "};\n"
             if sp.get("rt_ext"):
+                # (SEL: no map; one entry, at the copy's start)
+                ext = [(BASE + sc["off"] + po, so) for sc in sp["scripts"]
+                       for po, so in sc.get("rt_ext_entries", [])]
+                assert len(ext) == 1 and ext[0][1] == 0, (ovl, "RT_EXT: one entry at +0", ext)
                 s += (HDR_RT_DEFS + "#define MOD_RT_CUT_EXT\n"
-                      "// (the copy runs at MOD_RT_EXT_RUN: text_packs.py, rt_ext.c)\n"
-                      "static u8* const g_ModRtMap[][2] = {\n")
-                for sc in sp["scripts"]:
-                    for po, so in sc.get("rt_ext_entries", []):
-                        s += "    {(u8*)0x%08X, (u8*)(MOD_RT_EXT_RUN + %d)},\n" % (BASE + sc["off"] + po, so)
-                s += "};\n"
+                      "// (the copy runs at MOD_RT_EXT_RUN: text_packs.py, rt_ext.c)\n")
             fn = HDR_FN_JP if sp.get("jp_size") else HDR_FN
             if sp.get("rt_size"):
                 fn = fn.replace("    u32 i;\n\n", HDR_RT, 1)
             elif sp.get("rt_ext"):
-                fn = fn.replace("    u32 i;\n\n", HDR_RT_EXT, 1)
+                fn = fn.replace("    u32 i;\n\n", HDR_RT_EXT % (
+                    "script == (u8*)0x%08X" % ext[0][0]), 1)
             s += fn
         if sp:
             s = s.replace("#define MOD_PSP_SCRIPT\n",

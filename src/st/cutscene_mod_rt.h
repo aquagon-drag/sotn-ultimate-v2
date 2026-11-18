@@ -36,14 +36,8 @@
 #if defined(MOD_RT_CUT_EXT)
 // SEL (the endings): no room for the drawing here; the RT pack put it in
 // main.exe's free 8 KB (mods/sotn-ultimate/src/menu/rt_ext.c ModRtExt)
-static void ModRtCutChar(u8 ch) {
-    s32 start = g_Dialogue.nextCharX == g_Dialogue.nextLineX;
-
-    g_Dialogue.nextCharX++;
-    ((void (*)(s32, s32, s32, s32))MOD_RT_EXT_ADDR)(
-        ch, start, g_Dialogue.nextLineX,
-        g_Dialogue.nextCharY * 12 + MOD_RT_CUT_VY);
-}
+#define ModRtCutChar(ch)                                                       \
+    ((void (*)(s32, void*, void*))MOD_RT_EXT_ADDR)((ch), &g_Dialogue, NULL)
 #else
 static u8 g_ModRtCutLine[MOD_RT_CUT_MAX + 4];
 static s32 g_ModRtCutLen;

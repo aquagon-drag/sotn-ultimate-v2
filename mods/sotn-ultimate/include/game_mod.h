@@ -465,6 +465,8 @@ typedef struct {
 #define MOD_RT_EXT_END 0x80037E18
 #define MOD_RT_EXT_RUN 0x801E8600
 #define MOD_RT_EXT_RUN_END 0x801EA000
+#define MOD_RT_EXT_SCRIPT (-1) // ModRtExt's operations (rt_ext.c)
+#define MOD_RT_EXT_NAME (-2)
 #define MOD_RT8_CHARS 0x60
 #define MOD_RT8_TILE0 0x60
 #define MOD_RT8_FINAL 0x100
