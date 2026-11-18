@@ -220,6 +220,7 @@ void func_us_801A1150(Entity* self) {
 INCLUDE_ASM("boss/rbo6/nonmatchings/unk_1D690", func_us_801A11DC);
 
 void func_us_801A1B38(Entity* self) {
+    extern u16 D_us_80180540;
     Entity* real;
 
     if (*(s32*)0x801806E4 & 1) {
@@ -228,11 +229,15 @@ void func_us_801A1B38(Entity* self) {
     }
 
     if (!self->step) {
-        InitializeEntity((u16*)((u32)func_us_801A1B38 - 0x215F8));
+        // SOTN Ultimate: the decomp reached this data from the function's
+        // retail address (0x801A1B38 - 0x215F8 / - 0x2134C), wrong once the
+        // mod's code moves it (the data stays at its retail addresses:
+        // build_disc.sh checks "data section matches retail")
+        InitializeEntity(&D_us_80180540);
         self->blendMode = BLEND_ADD | BLEND_TRANSP;
     }
 
-    AnimateEntity((u8*)((u32)func_us_801A1B38 - 0x2134C), self);
+    AnimateEntity((u8*)0x801807EC, self);
 
     real = self->ext.succubus.real;
     self->posX.i.hi = real->posX.i.hi;
