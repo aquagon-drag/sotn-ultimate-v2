@@ -41,7 +41,6 @@
 #define MOD_RT_CUT_ON()                                                        \
     (g_ModRtCutScript &&                                                       \
      *(u8*)&MOD_DUB_STATE->textPack == MOD_TEXT_PACK_RT)
-#else
 static u8 g_ModRtCutLine[MOD_RT_CUT_MAX + 4];
 static s32 g_ModRtCutLen;
 
