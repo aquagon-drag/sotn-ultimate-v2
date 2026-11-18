@@ -166,6 +166,10 @@ def dra_image(path, syms):
 # DRA's BSS end to the player file); only the RT pack writes it, and only
 # Script = Retrans reads it (so the round trips leave it out: Ram.regions[2])
 RT_FONT_ADDR, RT_FONT_END = 0x8013B6A0, 0x8013C000
+# main.exe's free 8 KB (MOD_RT_EXT_ADDR / END): the endings' drawing code and
+# RT copy (rt_ext_blob); only the RT pack writes it, only SEL under Retrans
+# reads it (left out of the round trips too: Ram.regions[3])
+RT_EXT_ADDR, RT_EXT_END = 0x80035E18, 0x80037E18
 RTFONT = os.path.join(BUILD, "mod/rtfont")
 
 
@@ -173,7 +177,8 @@ class Ram:
     def __init__(self, dra, dub_addr, dub=None):
         assert DRA_BASE + len(dra) <= dub_addr and dub_addr + 4096 <= RT_FONT_ADDR
         self.regions = [(DRA_BASE, bytearray(dra)), (dub_addr, bytearray(dub or bytes(4096))),
-                        (RT_FONT_ADDR, bytearray(RT_FONT_END - RT_FONT_ADDR))]
+                        (RT_FONT_ADDR, bytearray(RT_FONT_END - RT_FONT_ADDR)),
+                        (RT_EXT_ADDR, bytearray(RT_EXT_END - RT_EXT_ADDR))]
 
     def _at(self, addr, n):
         for base, buf in self.regions:
@@ -418,10 +423,46 @@ def build_rt(ram, syms, d, dub_packs):
     # reads them, nothing puts them back)
     font = rt_font_blob(d)
     recs.append(("copy", d["MOD_RT_FONT_ADDR"], font))
+    # the endings' (SEL's) drawing code and RT copy (same: Default never
+    # reads them)
+    ext = rt_ext_blob(d)
+    if ext:
+        recs.append(("copy", d["MOD_RT_EXT_ADDR"], ext))
     info = {"ents": ents, "saves": saves, "notes": notes, "segs": segs, "rooms": rooms,
             "fill": fill, "strings": len(texts), "string_bytes": sum(map(len, placed)),
-            "font": (d["MOD_RT_FONT_ADDR"], font)}
+            "font": (d["MOD_RT_FONT_ADDR"], font),
+            "ext": (d["MOD_RT_EXT_ADDR"], ext) if ext else None}
     return recs, rest, info
+
+
+def rt_ext_blob(d):
+    """mods/sotn-ultimate/src/menu/rt_ext.c as built by build_rtfont.sh, then
+    at MOD_RT_EXT_COPY the RT_EXT overlay's (SEL's) RT copy from
+    psp_script.py's PATCHES: u32 length, then the script resolved for
+    MOD_RT_EXT_RUN (ModRtExt copies it there). None without that copy (no
+    PSP dub build, or no patched disc: then SEL has no RT map either)"""
+    import psp_script as P
+    a, c = d["MOD_RT_EXT_ADDR"], d["MOD_RT_EXT_COPY"]
+    assert (a, d["MOD_RT_EXT_END"]) == (RT_EXT_ADDR, RT_EXT_END)
+    if not os.path.exists(P.PATCHES):
+        return None
+    scs = [sc for p in json.load(open(P.PATCHES)) if p["ovl"] in P.RT_EXT
+           for sc in p["spill"]["scripts"] if sc.get("rt_ext_entries")]
+    if not scs:
+        return None
+    assert len(scs) == 1, "text packs: one RT_EXT script only"
+    code_path = os.path.join(RTFONT, "rtext.bin")
+    if not os.path.exists(code_path):
+        sys.exit("text packs: no %s (run mods/sotn-ultimate/tools/build_rtfont.sh)" % code_path)
+    code = open(code_path, "rb").read()
+    toks = [tuple(tuple(x) if isinstance(x, list) else x for x in t) for t in scs[0]["rt_tokens"]]
+    run = d["MOD_RT_EXT_RUN"]
+    script = bytes(P.assemble(P.resolve(toks, run)))
+    assert run + len(script) <= d["MOD_RT_EXT_RUN_END"], "text packs: the RT_EXT copy is too long"
+    assert a + len(code) <= c, "text packs: rt_ext.c runs past MOD_RT_EXT_COPY"
+    blob = code + bytes(c - a - len(code)) + struct.pack("<I", len(script)) + script
+    assert a + len(blob) <= d["MOD_RT_EXT_LINE"], "text packs: the RT_EXT copy reaches the line"
+    return blob
 
 
 def rt_font_blob(d):

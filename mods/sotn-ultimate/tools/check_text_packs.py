@@ -442,12 +442,21 @@ def rt_proof(d, syms, dra, dub, chunks, rt_chunks, sel_packs, rt_packs, info, qu
         errs.append("the RT font blob 0x%X+%d is outside its room" % (fa, len(fb)))
     if g.ram.read(fa, len(fb)) != fb:
         errs.append("the RT pack does not leave the font's code and glyphs in their room")
+    # main.exe's free 8 KB: the endings' code and RT copy, the same way
+    ext = set()
+    if info.get("ext"):
+        ea, eb = info["ext"]
+        ext = set(range(ea, ea + len(eb)))
+        if not (tp.RT_EXT_ADDR <= ea and ea + len(eb) <= tp.RT_EXT_END):
+            errs.append("the RT_EXT blob 0x%X+%d is outside its room" % (ea, len(eb)))
+        if g.ram.read(ea, len(eb)) != eb:
+            errs.append("the RT pack does not leave the endings' code and copy in their room")
     for p, recs in list(sel_packs.items()) + list(rt_packs.items()):
         b_, p_ = tp.footprint(recs)
         if p == tp.PACK_RT:
-            b_ = b_ - font
-        elif b_ & font:
-            errs.append("pack %s writes the RT font's room" % tp.PACK_NAMES[p])
+            b_ = b_ - font - ext
+        elif b_ & (font | ext):
+            errs.append("pack %s writes the RT font's or the endings' room" % tp.PACK_NAMES[p])
         if not b_ <= rooms:
             x = sorted(b_ - rooms)
             errs.append("pack %s writes outside the strings / rooms at 0x%X (+%d)" % (tp.PACK_NAMES[p], x[0], len(x)))

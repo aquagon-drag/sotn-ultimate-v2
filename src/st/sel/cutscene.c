@@ -130,6 +130,8 @@ static void ScaleCutsceneAvatar(u8 ySteps, Entity* self) {
     g_Dialogue.portraitAnimTimer++;
 }
 
+#include "../cutscene_mod_rt.h"
+
 void EntityCutscene(Entity* self) {
     s16 x, y;
     RECT* rect;
@@ -411,6 +413,12 @@ void EntityCutscene(Entity* self) {
             break;
         }
 
+#if defined(MOD_RT_CUTSCENE)
+        if (MOD_RT_CUT_ON()) {
+            ModRtCutChar(nextChar); // (cutscene_mod_rt.h)
+            break;
+        }
+#endif
         if (nextChar == ' ') {
             g_Dialogue.nextCharX += 2;
             break;

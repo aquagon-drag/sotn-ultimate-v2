@@ -81,7 +81,33 @@ MAX_COLS = 21
 # (src/st/cutscene_mod_rt.h in their character branch): only these get an
 # RT copy (Script = Retrans; rt_script.py's text, timed for the JP voices)
 RT_OVERLAYS = {"no3", "st0", "dai", "dre", "lib", "nz0", "top", "cen", "rcen", "no4",
-               "mar", "bo2", "bo5", "bo6", "rbo2", "rbo6"}  # (not SEL: no room)
+               "sel", "mar", "bo2", "bo5", "bo6", "rbo2", "rbo6"}
+# overlays with no room for their RT copy and its drawing: the RT pack puts
+# both in main.exe's free 8 KB (include/game_mod.h MOD_RT_EXT_*, rt_ext.c;
+# text_packs.py reads the copy from PATCHES); one script each
+RT_EXT = {"sel"}
+# Script = Retrans, the Saturn Maria fight (CEN's C arrays): its Saturn-only
+# lines, written from the Saturn's Japanese (gen_cen_maria.py NEW_PRE /
+# NEW_POST) in the retranslation's style. This project's own text (not the
+# patch's): {PS1 voice id: lines}
+RT_SATURN = {
+    0x3C1: ["So... I'm sorry, but I'll have to test", "your strength."],
+    0x3C2: ["A-As expected of you...", "With this, surely...", "Please... save Richter."],
+    0x3C3: ["That, I cannot guarantee.", "But I will stop him, without fail."],
+    0x3C4: ["I suppose that can't be helped", "either..."],
+}
+
+
+def rt_with_saturn(rtd):
+    """rt_script's lines + RT_SATURN's, under their own keys (PS1 - 2 would
+    hit the PS1 lines 0x3BF / 0x3C0)"""
+    out = dict(rtd)
+    for vid, lines in RT_SATURN.items():
+        items = []
+        for k, ln in enumerate(lines):
+            items += ([("BR",)] if k else []) + [("T", ln)]
+        out[("sat", vid)] = [(0, items)]
+    return out
 # asm-only cutscene entities: --apply points the character's `jal MoveImage`
 # at ModRtMoveImage (cutscene_mod_rt.h MOD_RT_CUT_ASM)
 RT_ASM = {"bo2", "bo5", "bo6", "rbo2", "rbo6"}
@@ -900,7 +926,7 @@ def rt_line_bytes(lines):
     return out
 
 
-def transplant(part, psp, dub, report, ovl=None, rt=False):
+def transplant(part, psp, dub, report, ovl=None, rt=False, trim=False):
     """plan for one script part: [("tok", index) | ("seg", ...) | ("app", ...)],
     replaced ids, ids with no PSP text. rt: psp is the retranslation's lines
     (rt_script.py, by patched JP id): its line breaks kept, no APPEND"""
@@ -926,7 +952,7 @@ def transplant(part, psp, dub, report, ovl=None, rt=False):
             continue
         if rt:
             import rt_script
-            sid = rt_script.RT_ID.get(vid, vid - 2)
+            sid = ("sat", vid) if vid in RT_SATURN else rt_script.RT_ID.get(vid, vid - 2)
         else:
             sid = TEXT_OVERRIDE.get(vid, vid - 2)
         if sid not in psp:
@@ -937,6 +963,10 @@ def transplant(part, psp, dub, report, ovl=None, rt=False):
         lines, end_waits = psp_lines(pick(psp, sid))
         if rt:
             lines = rt_line_bytes(lines)
+            # (the Saturn scripts go on in the same box after 0x3C0 "I know.",
+            # whose RT text ends with an empty line)
+            while trim and len(lines) > 1 and not lines[-1]:
+                lines.pop()
         else:
             lines = wrap(lines, cols, max_lines)
         # speed: the PS1 line's, by characters typed
@@ -1163,25 +1193,38 @@ def main():
                     rec["jp_entries"] = [[po, js + so] for (po, _), so in zip(starts, jents)]
                     sp["jp_size"] = js + jn
                 report.append("  JP copy: %d bytes, %d lines retimed%s" % (jn, len(jchanged), keeps))
-            if rtd is not None and "c" not in sc:
+            if rtd is not None:
                 # Script = Retrans: the retranslation's lines on the PS1
-                # skeleton (a missing one: the PSP's), timed for the JP voices
+                # skeleton (a missing one: the PSP's), timed for the JP voices.
+                # CEN's C arrays (the Saturn fight): the JP copy's skeleton
+                # (its NO_PSP line kept) and RT_SATURN's lines
+                c_arr = "c" in sc
+                rparts = [toks_jp] if c_arr else parts
+                rsrc = rt_with_saturn(rtd) if c_arr else rtd
                 rrend, rmiss = [], []
-                for part in parts:
-                    plan, _, miss = transplant(part, rtd, jdur, [], ovl, rt=True)
+                for part in rparts:
+                    plan, _, miss = transplant(part, rsrc, jdur, [], ovl, rt=True, trim=c_arr)
                     if miss:
                         plan, _, _ = transplant(part, psp, jdur, [], ovl)  # (whole part)
                         rmiss += miss
                     rrend.append((part, render(part, plan, 0, extra_ids)))
                 rfixed, rstarts = copy_tokens(rrend, off, blob, ovl, label)
-                rt_t, rents, rchanged = jp_adjust(rfixed, [so for _, so in rstarts], jdur, True, leads)
+                rt_t, rents, rchanged = jp_adjust(rfixed, [so for _, so in rstarts], jdur, True,
+                                                  flag_leads(toks_jp) if c_arr else leads)
                 rec = sp["scripts"][-1]
                 rec["rt_tokens"] = rt_t
                 rn = len(assemble(resolve(rt_t, BASE)))
-                rs = sp.get("rt_size", 0)
-                rec["rt_at"] = rs
-                rec["rt_entries"] = [[po, rs + so] for (po, _), so in zip(rstarts, rents)]
-                sp["rt_size"] = rs + rn
+                if ovl in RT_EXT:
+                    # (text_packs.py puts it in the RT pack; its entries are
+                    # offsets from the copy's start at MOD_RT_EXT_RUN)
+                    assert not sp.get("rt_ext"), (ovl, "one RT_EXT script only")
+                    sp["rt_ext"] = True
+                    rec["rt_ext_entries"] = [[po, so] for (po, _), so in zip(rstarts, rents)]
+                else:
+                    rs = sp.get("rt_size", 0)
+                    rec["rt_at"] = rs
+                    rec["rt_entries"] = [[po, rs + so] for (po, _), so in zip(rstarts, rents)]
+                    sp["rt_size"] = rs + rn
                 report.append("  RT copy: %d bytes, %d lines retimed%s" % (
                     rn, len(rchanged), ", PSP text for " + " ".join("%X" % v for v in rmiss)
                     if rmiss else ""))
@@ -1288,6 +1331,12 @@ HDR_RT = """    u32 i;
         }
     }
 """
+# RT_EXT (SEL): the copy is in main.exe's free 8 KB; ModRtExt(-1) puts it at
+# MOD_RT_EXT_RUN before it plays (rt_ext.c)
+HDR_RT_EXT = HDR_RT.replace("""                g_ModRtCutScript = 1;
+""", """                g_ModRtCutScript = 1;
+                ((void (*)(s32, s32, s32, s32))MOD_RT_EXT_ADDR)(-1, 0, 0, 0);
+""")
 # the RT copies' header lines (before g_ModRtMap)
 HDR_RT_DEFS = ("// Script = Retrans: the retranslation's text (rt_script.py), timed for\n"
                "// the JP voices, drawn in its 12 px font (cutscene_mod_rt.h) while\n"
@@ -1387,9 +1436,19 @@ def write_spill_headers(spills):
                     for po, so in sc.get("rt_entries", []):
                         s += "    {(u8*)0x%08X, g_ModRtSpill + %d},\n" % (BASE + sc["off"] + po, so)
                 s += "};\n"
+            if sp.get("rt_ext"):
+                s += (HDR_RT_DEFS + "#define MOD_RT_CUT_EXT\n"
+                      "// (the copy runs at MOD_RT_EXT_RUN: text_packs.py, rt_ext.c)\n"
+                      "static u8* const g_ModRtMap[][2] = {\n")
+                for sc in sp["scripts"]:
+                    for po, so in sc.get("rt_ext_entries", []):
+                        s += "    {(u8*)0x%08X, (u8*)(MOD_RT_EXT_RUN + %d)},\n" % (BASE + sc["off"] + po, so)
+                s += "};\n"
             fn = HDR_FN_JP if sp.get("jp_size") else HDR_FN
             if sp.get("rt_size"):
                 fn = fn.replace("    u32 i;\n\n", HDR_RT, 1)
+            elif sp.get("rt_ext"):
+                fn = fn.replace("    u32 i;\n\n", HDR_RT_EXT, 1)
             s += fn
         if sp:
             s = s.replace("#define MOD_PSP_SCRIPT\n",
@@ -1466,8 +1525,8 @@ def apply(off, check=False):
                     b[o:o + len(code)] = code
                     changed = True
                 jcount += 1
-            if sc.get("rt_tokens"):
-                # Script = Retrans's copy
+            if sc.get("rt_tokens") and "rt_at" in sc:
+                # Script = Retrans's copy (not RT_EXT's: text_packs.py)
                 addr = int(mr[1], 16) + sc["rt_at"]
                 toks = [tuple(tuple(a) if isinstance(a, list) else a for a in t)
                         for t in sc["rt_tokens"]]

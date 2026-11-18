@@ -114,4 +114,35 @@ w=$(nm_of "$OUT/rtfont.elf" g_ModRtW)
 if [ $((ADDR + code)) -gt $((w)) ] || [ $((w - ADDR - code)) -ge 4 ]; then
     echo "FAIL rtfont: the code ($code B) does not end where g_ModRtW starts"; exit 1
 fi
+# the endings' 12 px drawing (rt_ext.c), at MOD_RT_EXT_ADDR in main.exe's
+# free 8 KB; the RT pack writes it with the endings' RT copy after it
+EXT=$(grep -oE "#define MOD_RT_EXT_ADDR 0x[0-9A-Fa-f]+" $H | awk '{print $3}')
+EXTC=$(grep -oE "#define MOD_RT_EXT_COPY 0x[0-9A-Fa-f]+" $H | awk '{print $3}')
+cc mods/sotn-ultimate/src/menu/rt_ext.c "$OUT/rtext.o"
+cat > "$OUT/rtext.ld" <<EOF2
+SECTIONS {
+    . = $EXT;
+    .text : { *(.text) *(.rodata*) *(.rdata) }
+    .data : { *(.data) *(.sdata) }
+    .bss : { *(.bss) *(.sbss) *(COMMON) }
+    /DISCARD/ : { *(.reginfo) *(.pdr) *(.mdebug*) *(.comment) *(.gnu*) *(.MIPS*) }
+}
+EOF2
+mipsel-linux-gnu-ld -nostdlib --no-check-sections -Map "$OUT/rtext.map" \
+    -T "$OUT/rtext.ld" -o "$OUT/rtext.elf" "$OUT/rtext.o"
+for s in .data .bss; do
+    sz=$(mipsel-linux-gnu-objdump -h "$OUT/rtext.elf" | awk -v s=$s '$2==s{print $3}')
+    if [ -n "$sz" ] && [ $((16#$sz)) -ne 0 ]; then
+        echo "FAIL rtfont: rt_ext.c's $s is not empty"; exit 1
+    fi
+done
+if [ "$(nm_of "$OUT/rtext.elf" ModRtExt)" != "$(printf 0x%08x $EXT)" ]; then
+    echo "FAIL rtfont: ModRtExt is not at MOD_RT_EXT_ADDR $EXT"; exit 1
+fi
+mipsel-linux-gnu-objcopy -O binary -j .text "$OUT/rtext.elf" "$OUT/rtext.bin"
+ext=$(stat -c %s "$OUT/rtext.bin")
+if [ $((EXT + ext)) -gt $((EXTC)) ]; then
+    echo "FAIL rtfont: rt_ext.c's code ($ext B) runs past MOD_RT_EXT_COPY $EXTC"; exit 1
+fi
+echo "rtfont: endings' drawing $ext B at $EXT"
 echo "rtfont: code $code B at $ADDR, font tables $w-$endr; 8 px font: code $(stat -c %s "$OUT/rtfont8.bin") B at $ADDR8, $((w8 - end8)) B left before its widths at $w8"

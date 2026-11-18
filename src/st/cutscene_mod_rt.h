@@ -29,12 +29,24 @@
 #define MOD_RT_CUT_VY 0x180 // the text texture's top (NO3: 0x100)
 #endif
 
-static u8 g_ModRtCutLine[MOD_RT_CUT_MAX + 4];
-static s32 g_ModRtCutLen;
-
 #define MOD_RT_CUT_ON()                                                        \
     (g_ModRtCutScript &&                                                       \
      *(u8*)&MOD_DUB_STATE->textPack == MOD_TEXT_PACK_RT)
+
+#if defined(MOD_RT_CUT_EXT)
+// SEL (the endings): no room for the drawing here; the RT pack put it in
+// main.exe's free 8 KB (mods/sotn-ultimate/src/menu/rt_ext.c ModRtExt)
+static void ModRtCutChar(u8 ch) {
+    s32 start = g_Dialogue.nextCharX == g_Dialogue.nextLineX;
+
+    g_Dialogue.nextCharX++;
+    ((void (*)(s32, s32, s32, s32))MOD_RT_EXT_ADDR)(
+        ch, start, g_Dialogue.nextLineX,
+        g_Dialogue.nextCharY * 12 + MOD_RT_CUT_VY);
+}
+#else
+static u8 g_ModRtCutLine[MOD_RT_CUT_MAX + 4];
+static s32 g_ModRtCutLen;
 
 static void ModRtCutPut(u8 ch, s32 start) {
     RECT rect;
@@ -108,4 +120,5 @@ static void ModRtCutChar(u8 ch) {
     ModRtCutPut(ch, start);
 }
 #endif
+#endif // MOD_RT_CUT_EXT
 #endif
