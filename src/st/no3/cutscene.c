@@ -192,6 +192,9 @@ extern u_long D_8943B8C;
 extern u8 cutscene_data[];
 #endif
 
+#define MOD_RT_CUT_VY 0x100 // (this texture's top, below)
+#include "../cutscene_mod_rt.h"
+
 void EntityCutscene(Entity* self) {
 #ifndef VERSION_US
     const int PRIM_COUNT = 4;
@@ -693,6 +696,12 @@ void EntityCutscene(Entity* self) {
 #endif
             break;
         } // Close the giant while loop
+#if defined(MOD_RT_CUTSCENE)
+        if (MOD_RT_CUT_ON()) {
+            ModRtCutChar(nextChar); // (cutscene_mod_rt.h)
+            break;
+        }
+#endif
 #ifdef VERSION_HD
         var_v0 = g_api.func_80106A28(nextChar, 1);
         if (var_v0) {

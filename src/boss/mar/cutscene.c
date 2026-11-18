@@ -42,6 +42,8 @@ extern u16 D_us_801805E8[];
 extern s16 D_us_801805F0[];
 
 extern u8 cutscene_data[];
+#include "../../st/cutscene_mod_rt.h"
+
 void EntityCutscene(Entity* self) {
     const int PrimCount = 72;
     Primitive* prim;
@@ -392,6 +394,12 @@ void EntityCutscene(Entity* self) {
             break;
         }
 
+#if defined(MOD_RT_CUTSCENE)
+        if (MOD_RT_CUT_ON()) {
+            ModRtCutChar(nextChar); // (cutscene_mod_rt.h)
+            break;
+        }
+#endif
         if (nextChar == ' ') {
             g_Dialogue.nextCharX += 2;
             return;

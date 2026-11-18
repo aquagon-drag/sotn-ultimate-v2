@@ -46,6 +46,8 @@ extern s32 g_IsCutsceneDone; // bss
 
 // cutscene where alucard and maria discuss castle changing
 extern u8 cutscene_data[];
+#include "../cutscene_mod_rt.h"
+
 void EntityCutscene(Entity* self) {
     s16 uCoord;
     s16 vCoord;
@@ -367,6 +369,12 @@ void EntityCutscene(Entity* self) {
             }
             break; // This breaks the big while-loop!
         }
+#if defined(MOD_RT_CUTSCENE)
+        if (MOD_RT_CUT_ON()) {
+            ModRtCutChar(nextChar); // (cutscene_mod_rt.h)
+            break;
+        }
+#endif
         if (nextChar == 0x20) {
             g_Dialogue.nextCharX += 2;
             return;

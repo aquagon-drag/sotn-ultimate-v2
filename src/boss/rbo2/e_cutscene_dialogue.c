@@ -27,4 +27,8 @@ INCLUDE_RODATA("boss/rbo2/nonmatchings/e_cutscene_dialogue", D_us_8019AE04);
 
 INCLUDE_RODATA("boss/rbo2/nonmatchings/e_cutscene_dialogue", D_us_8019AE0C);
 
+// Script = Retrans: ModRtMoveImage, the redirected character draw of the
+// entity below (psp_script.py --apply)
+#include "../../st/cutscene_mod_rt.h"
+
 INCLUDE_ASM("boss/rbo2/nonmatchings/e_cutscene_dialogue", EntityCutsceneDialogue);

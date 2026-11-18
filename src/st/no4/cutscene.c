@@ -172,6 +172,8 @@ static bool dialogue_started;
 // Unused by pspeu and deadstripped
 #include "../cutscene_scale_avatar.h"
 
+#include "../cutscene_mod_rt.h"
+
 void EntityCutscene(Entity* self) {
     Primitive* prim;
     s32 i, j;
@@ -578,6 +580,12 @@ void EntityCutscene(Entity* self) {
             } // This closes the CSOP switch for psx
             break; // This breaks the big while loop for psx
         } // This closes the big while loop for psx
+#if defined(MOD_RT_CUTSCENE)
+        if (MOD_RT_CUT_ON()) {
+            ModRtCutChar(nextByte); // (cutscene_mod_rt.h)
+            break;
+        }
+#endif
         if (nextByte == ASCII_SPACE) {
             g_Dialogue.nextCharX += 2;
             return;

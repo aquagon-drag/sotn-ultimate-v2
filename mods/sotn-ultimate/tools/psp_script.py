@@ -64,6 +64,7 @@ import json
 import math
 import os
 import re
+import struct
 import sys
 from collections import Counter
 
@@ -79,7 +80,12 @@ MAX_COLS = 21
 # the overlays whose cutscenes draw the retranslation's 12 px font
 # (src/st/cutscene_mod_rt.h in their character branch): only these get an
 # RT copy (Script = Retrans; rt_script.py's text, timed for the JP voices)
-RT_OVERLAYS = {"lib"}
+RT_OVERLAYS = {"no3", "st0", "dai", "dre", "lib", "nz0", "top", "cen", "rcen", "no4",
+               "mar", "bo2", "bo5", "bo6", "rbo2", "rbo6"}  # (not SEL: no room)
+# asm-only cutscene entities: --apply points the character's `jal MoveImage`
+# at ModRtMoveImage (cutscene_mod_rt.h MOD_RT_CUT_ASM)
+RT_ASM = {"bo2", "bo5", "bo6", "rbo2", "rbo6"}
+MOVE_IMAGE_JAL = bytes.fromhex("FB4A000C")  # jal 0x80012BEC (config/symbols.us.txt)
 # overlay -> (columns, lines per box) where the box differs (see above)
 BOX_LIMITS = {"no4": (22, 3)}
 
@@ -1272,14 +1278,22 @@ HDR_FN_JP = """static u8* ModPspScript(u8* script) {
 """
 HDR_RT = """    u32 i;
 
+    g_ModRtCutScript = 0;
     if (*(u8*)&MOD_DUB_STATE->textPack == MOD_TEXT_PACK_RT) {
         for (i = 0; i < sizeof(g_ModRtMap) / sizeof(g_ModRtMap[0]); i++) {
             if (script == g_ModRtMap[i][0]) {
+                g_ModRtCutScript = 1;
                 return g_ModRtMap[i][1];
             }
         }
     }
 """
+# the RT copies' header lines (before g_ModRtMap)
+HDR_RT_DEFS = ("// Script = Retrans: the retranslation's text (rt_script.py), timed for\n"
+               "// the JP voices, drawn in its 12 px font (cutscene_mod_rt.h) while\n"
+               "// g_ModRtCutScript (the playing script is one of these)\n"
+               "#define MOD_RT_CUTSCENE\n"
+               "static u8 g_ModRtCutScript;\n")
 HDR_FN = """static u8* ModPspScript(u8* script) {
     u32 i;
 
@@ -1323,14 +1337,29 @@ def write_spill_headers(spills):
                     s += "    " + ", ".join("0x%02X" % x for x in code[i:i + 16]) + ",\n"
                 s += "};\n"
                 jrows.append("    {%s, g_ModJpCopy%d}," % (sc["sym"], k))
+            rrows = []
+            for k, sc in enumerate(sp["scripts"]):
+                if not sc.get("rt_tokens"):
+                    continue
+                code = assemble(sc["rt_tokens"])
+                s += "u8 g_ModRtCopy%d[] __attribute__((section(\".rodata\"))) = {\n" % k
+                for i in range(0, len(code), 16):
+                    s += "    " + ", ".join("0x%02X" % x for x in code[i:i + 16]) + ",\n"
+                s += "};\n"
+                rrows.append("    {%s, g_ModRtCopy%d}," % (sc["sym"], k))
             s += "static u8* const g_ModPspMap[][2] = {\n" + "\n".join(rows) + "\n};\n"
+            if rrows:
+                s += (HDR_RT_DEFS + "static u8* const g_ModRtMap[][2] = {\n" +
+                      "\n".join(rrows) + "\n};\n")
             if jrows:
                 s += ("// the JP dub's copies (boxes held for the Japanese voices; a NO_PSP\n"
                       "// line kept)\n"
                       "static u8* const g_ModJpMap[][2] = {\n" + "\n".join(jrows) +
-                      "\n};\n" + HDR_FN_JP)
-            else:
-                s += HDR_FN
+                      "\n};\n")
+            fn = HDR_FN_JP if jrows else HDR_FN
+            if rrows:
+                fn = fn.replace("    u32 i;\n\n", HDR_RT, 1)
+            s += fn
         elif sp:
             s += ("// (g_ModPspSpill is filled in the built overlay by --apply)\n"
                   "#define MOD_PSP_SCRIPT\n"
@@ -1350,10 +1379,8 @@ def write_spill_headers(spills):
                         s += "    {(u8*)0x%08X, g_ModJpSpill + %d},\n" % (BASE + sc["off"] + po, so)
                 s += "};\n"
             if sp.get("rt_size"):
-                s += ("// Script = Retrans: the retranslation's text (rt_script.py), timed for\n"
-                      "// the JP voices, drawn in its 12 px font (cutscene_mod_rt.h); filled by\n"
-                      "// --apply too\n"
-                      "#define MOD_RT_CUTSCENE\n"
+                s += (HDR_RT_DEFS + ("#define MOD_RT_CUT_ASM\n" if ovl in RT_ASM else "") +
+                      "// (filled by --apply too)\n"
                       "u8 g_ModRtSpill[%d] __attribute__((section(\".rodata\"))) = {0};\n"
                       "static u8* const g_ModRtMap[][2] = {\n" % sp["rt_size"])
                 for sc in sp["scripts"]:
@@ -1466,6 +1493,23 @@ def apply(off, check=False):
                 b[o:o + len(code)] = code
                 changed = True
             count += 1
+        if p["ovl"] in RT_ASM and p["spill"].get("rt_size"):
+            # the asm entity's character: `jal MoveImage` after the line's
+            # VRAM y (addiu a2,a2,0x180; sll a2,a2,16) -> jal ModRtMoveImage
+            mm = re.search(r"0x([0-9a-f]+)\s+ModRtMoveImage\n",
+                           open(os.path.join(ROOT, p["map"])).read())
+            assert mm, "%s: ModRtMoveImage not linked (cutscene_mod_rt.h?)" % p["map"]
+            new_jal = struct.pack("<I", 0x0C000000 | (int(mm[1], 16) & 0x3FFFFFF) >> 2)
+            head = struct.pack("<II", 0x24C60180, 0x00063400)
+            hits = {j: b[j + 8:j + 12] for j in range(0, len(b) - 12, 4)
+                    if b[j:j + 8] == head and b[j + 8:j + 12] in (MOVE_IMAGE_JAL, new_jal)}
+            assert len(hits) == 1, "%s: %d character MoveImage calls" % (p["bin"], len(hits))
+            (j, w), = hits.items()
+            if w != new_jal:
+                if check:
+                    sys.exit("psp_script: %s at 0x%X: MoveImage not redirected" % (p["bin"], j + 8))
+                b[j + 8:j + 12] = new_jal
+                changed = True
         if changed:
             open(path, "wb").write(b)
             touched.append(p["bin"])

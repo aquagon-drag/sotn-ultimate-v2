@@ -207,6 +207,8 @@ s32 dialogue_started;
 
 #include "../cutscene_scale_avatar.h"
 
+#include "../cutscene_mod_rt.h"
+
 void EntityCutscene(Entity* self) {
     u16 nextChar;
     s32 primIndex;
@@ -673,6 +675,12 @@ void EntityCutscene(Entity* self) {
             } // This closes the CSOP switch for psx
             break; // This breaks the big while loop for psx
         } // This closes the big while loop for psx
+#if defined(MOD_RT_CUTSCENE)
+        if (MOD_RT_CUT_ON()) {
+            ModRtCutChar(nextChar); // (cutscene_mod_rt.h)
+            break;
+        }
+#endif
         if (nextChar == 32) {
             g_Dialogue.nextCharX += 2;
             return;

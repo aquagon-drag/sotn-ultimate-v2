@@ -74,6 +74,8 @@ static s32 g_IsCutsceneDone;
 #endif
 
 extern u8 cutscene_data[];
+#include "../cutscene_mod_rt.h"
+
 void EntityCutscene(Entity* self) {
 #ifdef VERSION_US
     RECT rect;
@@ -435,6 +437,12 @@ void EntityCutscene(Entity* self) {
 
                 break; // This breaks the big while-loop!
             }
+#if defined(MOD_RT_CUTSCENE)
+            if (MOD_RT_CUT_ON()) {
+                ModRtCutChar(nextChar); // (cutscene_mod_rt.h)
+                break;
+            }
+#endif
 #ifdef VERSION_HD
             j = g_api.func_80106A28(nextChar, 1);
             if (j) {

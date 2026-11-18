@@ -43,6 +43,8 @@ static const char* actor_names[] = {_S("Alucard"), _S("Maria"), _S("Richter")};
 #include "../cutscene_skip.h"
 #include "../cutscene_scale_avatar.h"
 
+#include "../cutscene_mod_rt.h"
+
 void EntityCutscene(Entity* self) {
     RECT rect;
     Primitive* prim;
@@ -351,6 +353,12 @@ void EntityCutscene(Entity* self) {
             }
             break; // This breaks the big while-loop!
         }
+#if defined(MOD_RT_CUTSCENE)
+        if (MOD_RT_CUT_ON()) {
+            ModRtCutChar(nextChar); // (cutscene_mod_rt.h)
+            break;
+        }
+#endif
         if (nextChar == 0x20) {
             g_Dialogue.nextCharX += 2;
             return;

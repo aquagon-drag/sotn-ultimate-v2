@@ -258,6 +258,8 @@ static u8 SetCutsceneScript(u8* script) {
 #include "../cutscene_scale_avatar.h"
 #endif
 
+#include "../cutscene_mod_rt.h"
+
 void EntityCutscene(Entity* self) {
     u16 nextByte;
     s32 primIndex;
@@ -677,6 +679,12 @@ void EntityCutscene(Entity* self) {
             } // This closes the CSOP switch for psx
             break; // This breaks the big while loop for psx
         } // This closes the big while loop for psx
+#if defined(MOD_RT_CUTSCENE)
+        if (MOD_RT_CUT_ON()) {
+            ModRtCutChar(nextByte); // (cutscene_mod_rt.h)
+            break;
+        }
+#endif
         if (nextByte == ' ') {
             g_Dialogue.nextCharX += 2;
             return;

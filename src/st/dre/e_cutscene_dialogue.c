@@ -212,6 +212,8 @@ void SetCutsceneEvents(u8* ptr) {
 #include "../cutscene_skip.h"
 #include "../cutscene_scale_avatar.h"
 
+#include "../cutscene_mod_rt.h"
+
 void EntityCutsceneDialogue(Entity* self) {
     Primitive* prim;
     s32 primIndex;
@@ -675,6 +677,12 @@ void EntityCutsceneDialogue(Entity* self) {
             } // This closes the CSOP switch for psx
             break; // This breaks the big while loop for psx
         } // This closes the big while loop for psx
+#if defined(MOD_RT_CUTSCENE)
+        if (MOD_RT_CUT_ON()) {
+            ModRtCutChar(nextChar); // (cutscene_mod_rt.h)
+            break;
+        }
+#endif
         if (nextChar == 32) {
             g_Dialogue.nextCharX += 2;
             return;
