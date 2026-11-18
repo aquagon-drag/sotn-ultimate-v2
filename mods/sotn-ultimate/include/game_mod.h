@@ -459,7 +459,7 @@ typedef struct {
 // script's jumps reach 0x801xxxxx only, so ModRtExt(-1, ...) copies it
 // there, after the 12 px drawing's strip at DEMO_KEY_PTR, when it starts).
 // The line being typed is kept at MOD_RT_EXT_LINE (84 B + its s32 length).
-#define MOD_RT_EXT_ADDR 0x80035E18
+#define MOD_RT_EXT_ADDR 0x80035E20 // (16-aligned: the reserve starts at 0x80035E18)
 #define MOD_RT_EXT_COPY 0x80036018
 #define MOD_RT_EXT_LINE 0x80037D80
 #define MOD_RT_EXT_END 0x80037E18

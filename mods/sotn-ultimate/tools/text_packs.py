@@ -169,7 +169,7 @@ RT_FONT_ADDR, RT_FONT_END = 0x8013B6A0, 0x8013C000
 # main.exe's free 8 KB (MOD_RT_EXT_ADDR / END): the endings' drawing code and
 # RT copy (rt_ext_blob); only the RT pack writes it, only SEL under Retrans
 # reads it (left out of the round trips too: Ram.regions[3])
-RT_EXT_ADDR, RT_EXT_END = 0x80035E18, 0x80037E18
+RT_EXT_ADDR, RT_EXT_END = 0x80035E20, 0x80037E18
 RTFONT = os.path.join(BUILD, "mod/rtfont")
 
 
