@@ -1334,12 +1334,15 @@ HDR_RT = """    u32 i;
 # RT_EXT (SEL): the copy is in main.exe's free 8 KB; ModRtExt(-1) puts it at
 # MOD_RT_EXT_RUN before it plays (rt_ext.c)
 HDR_RT_EXT = """    u32 i;
+    u8* rt;
 
     g_ModRtCutScript = 0;
-    if (*(u8*)&MOD_DUB_STATE->textPack == MOD_TEXT_PACK_RT && (%s)) {
-        g_ModRtCutScript = 1;
-        ((void (*)(s32, void*, void*))MOD_RT_EXT_ADDR)(MOD_RT_EXT_SCRIPT, NULL, NULL);
-        return (u8*)MOD_RT_EXT_RUN;
+    if (*(u8*)&MOD_DUB_STATE->textPack == MOD_TEXT_PACK_RT) {
+        rt = ((u8* (*)(s32, void*))MOD_RT_EXT_ADDR)(MOD_RT_EXT_SCRIPT, script);
+        if (rt != NULL) {
+            g_ModRtCutScript = 1;
+            return rt;
+        }
     }
 """
 # the RT copies' header lines (before g_ModRtMap)
@@ -1452,8 +1455,7 @@ def write_spill_headers(spills):
             if sp.get("rt_size"):
                 fn = fn.replace("    u32 i;\n\n", HDR_RT, 1)
             elif sp.get("rt_ext"):
-                fn = fn.replace("    u32 i;\n\n", HDR_RT_EXT % (
-                    "script == (u8*)0x%08X" % ext[0][0]), 1)
+                fn = fn.replace("    u32 i;\n\n", HDR_RT_EXT, 1)
             s += fn
         if sp:
             s = s.replace("#define MOD_PSP_SCRIPT\n",

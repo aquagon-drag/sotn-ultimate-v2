@@ -438,7 +438,8 @@ def build_rt(ram, syms, d, dub_packs):
 def rt_ext_blob(d):
     """mods/sotn-ultimate/src/menu/rt_ext.c as built by build_rtfont.sh, then
     at MOD_RT_EXT_COPY the RT_EXT overlay's (SEL's) RT copy from
-    psp_script.py's PATCHES: u32 length, then the script resolved for
+    psp_script.py's PATCHES: u32 length, u32 the retail script's address
+    (ModRtExt's SCRIPT compares it), then the script resolved for
     MOD_RT_EXT_RUN (ModRtExt copies it there). None without that copy (no
     PSP dub build, or no patched disc: then SEL has no RT map either)"""
     import psp_script as P
@@ -460,7 +461,10 @@ def rt_ext_blob(d):
     script = bytes(P.assemble(P.resolve(toks, run)))
     assert run + len(script) <= d["MOD_RT_EXT_RUN_END"], "text packs: the RT_EXT copy is too long"
     assert a + len(code) <= c, "text packs: rt_ext.c runs past MOD_RT_EXT_COPY"
-    blob = code + bytes(c - a - len(code)) + struct.pack("<I", len(script)) + script
+    ents = scs[0]["rt_ext_entries"]
+    assert len(ents) == 1 and ents[0][1] == 0, "text packs: the RT_EXT copy has one entry, at +0"
+    retail = P.BASE + scs[0]["off"] + ents[0][0]
+    blob = code + bytes(c - a - len(code)) + struct.pack("<II", len(script), retail) + script
     assert a + len(blob) <= d["MOD_RT_EXT_LINE"], "text packs: the RT_EXT copy reaches the line"
     return blob
 

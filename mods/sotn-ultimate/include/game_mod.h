@@ -455,12 +455,13 @@ typedef struct {
 // (FntOpen's unused sprite buffer tail, BSS: ram-and-space-reserves.md)
 // holds, written by the RT pack, ModRtExt (mods/sotn-ultimate/src/menu/
 // rt_ext.c, built by build_rtfont.sh) and at MOD_RT_EXT_COPY the endings'
-// RT copy (u32 length, then the script, resolved for MOD_RT_EXT_RUN: a
+// RT copy (u32 length, u32 the retail script's address, then the script,
+// resolved for MOD_RT_EXT_RUN: a
 // script's jumps reach 0x801xxxxx only, so ModRtExt(-1, ...) copies it
 // there, after the 12 px drawing's strip at DEMO_KEY_PTR, when it starts).
 // The line being typed is kept at MOD_RT_EXT_LINE (84 B + its s32 length).
 #define MOD_RT_EXT_ADDR 0x80035E20 // (16-aligned: the reserve starts at 0x80035E18)
-#define MOD_RT_EXT_COPY 0x80036018
+#define MOD_RT_EXT_COPY 0x80036220
 #define MOD_RT_EXT_LINE 0x80037D80
 #define MOD_RT_EXT_END 0x80037E18
 #define MOD_RT_EXT_RUN 0x801E8600

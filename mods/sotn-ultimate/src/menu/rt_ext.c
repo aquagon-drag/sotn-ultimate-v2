@@ -11,17 +11,22 @@
 // linked at MOD_RT_EXT_ADDR, ModRtExt first, no data or BSS (the line is
 // kept at MOD_RT_EXT_LINE, past the copy).
 //
-// ModRtExt(op, a):
+// void* ModRtExt(op, a):
 // - op >= 0: byte op of the dialogue being typed, a = SEL's g_Dialogue
 //   (src/st/cutscene_mod_rt.h ModRtCutChar's work): add it to the line (a
 //   new line at nextLineX), draw the whole line with ModRtText into the
 //   strip at DEMO_KEY_PTR, load its 12 rows into the text texture;
-// - MOD_RT_EXT_SCRIPT: SEL's ModPspScript is starting the RT copy: copy it
-//   to MOD_RT_EXT_RUN (a script's jumps reach 0x801xxxxx only);
-// - MOD_RT_EXT_NAME: a = the actor name, b = its first sprite, as SEL's
-//   DrawCutsceneActorName (src/st/cutscene_actor_name.h) just made them in
-//   the US 8x8 font: tiles and x of the RT 8 px font instead (as its
-//   MOD_RT_CUTSCENE branch).
+// - MOD_RT_EXT_SCRIPT: SEL's ModPspScript starts script a: when it is the
+//   one the RT copy replaces, copy the copy to MOD_RT_EXT_RUN (a script's
+//   jumps reach 0x801xxxxx only) and return that, else NULL;
+// - MOD_RT_EXT_NAME: a = the primIndex of the actor name's sprites, as
+//   SEL's DrawCutsceneActorName (src/st/cutscene_actor_name.h) just made
+//   them in the US 8x8 font: the RT 8 px font's tiles and x instead (as its
+//   MOD_RT_CUTSCENE branch). The characters come back from the sprites:
+//   the tile is the character, and a US space is 4 px more between two
+//   sprites (letters advance 8).
+// The blob at MOD_RT_EXT_COPY: u32 length, u32 the retail script's
+// address, the copy (text_packs.py rt_ext_blob).
 #include <game.h>
 #include <cutscene.h>
 
@@ -31,11 +36,11 @@
 #define EXT_VY 0x180 // SEL's text texture top
 #define EXT_LINE ((u8*)MOD_RT_EXT_LINE)
 #define EXT_LEN (*(s32*)(MOD_RT_EXT_LINE + 84))
+#define EXT_PRIMS ((Primitive*)0x80086FEC) // g_PrimBuf (config/symbols.us.txt)
 
-void ModRtExt(s32 op, void* a, void* b) {
+void* ModRtExt(s32 op, void* a) {
     Dialogue* dlg;
     Primitive* prim;
-    const u8* name;
     const u8* rtW;
     RECT rect;
     u8* old;
@@ -44,38 +49,41 @@ void ModRtExt(s32 op, void* a, void* b) {
     s32 i;
     s32 n;
     s32 x;
+    s32 usX;
     u8 ch;
 
     if (op == MOD_RT_EXT_SCRIPT) {
+        if (a != *(void**)(MOD_RT_EXT_COPY + 4)) {
+            return NULL;
+        }
         n = *(s32*)MOD_RT_EXT_COPY;
-        src = (u8*)(MOD_RT_EXT_COPY + 4);
+        src = (u8*)(MOD_RT_EXT_COPY + 8);
         dst = (u8*)MOD_RT_EXT_RUN;
         for (i = 0; i < n; i++) {
             dst[i] = src[i];
         }
-        return;
+        return dst;
     }
     if (op == MOD_RT_EXT_NAME) {
-        name = a;
         rtW = (const u8*)(MOD_RT_FONT_END - MOD_RT8_CHARS);
         x = 0x38;
-        for (prim = b; prim != NULL;) {
-            ch = *name++;
+        usX = 0x38;
+        for (prim = &EXT_PRIMS[(s32)a]; prim != NULL; prim = prim->next) {
+            for (; usX < prim->x0; usX += FONT_SPACE) {
+                x += rtW[CH(' ')];
+            }
+            usX = prim->x0 + FONT_GAP;
+            ch = (prim->u0 / FONT_W) | ((prim->v0 * (FONT_H / 4)) & 0xF0);
+            prim->x0 = x;
             if (ch >= MOD_RT8_CHARS) { // (the US glyph, as the C branch)
-                prim->x0 = x;
-                prim = prim->next;
                 x += FONT_GAP;
                 continue;
             }
-            if (ch != CH(' ')) {
-                prim->u0 = ((ch + MOD_RT8_TILE0) & 0x0F) * FONT_W;
-                prim->v0 = ((ch + MOD_RT8_TILE0) & 0xF0) / (FONT_H / 4);
-                prim->x0 = x;
-                prim = prim->next;
-            }
+            prim->u0 = ((ch + MOD_RT8_TILE0) & 0x0F) * FONT_W;
+            prim->v0 = ((ch + MOD_RT8_TILE0) & 0xF0) / (FONT_H / 4);
             x += rtW[ch];
         }
-        return;
+        return NULL;
     }
     dlg = a;
     if (dlg->nextCharX == dlg->nextLineX) {
@@ -104,4 +112,5 @@ void ModRtExt(s32 op, void* a, void* b) {
         ((int (*)(int))0x8001290C)(0);
     }
     *(u8**)0x8013794C = old;
+    return NULL;
 }

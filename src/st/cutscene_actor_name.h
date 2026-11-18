@@ -16,13 +16,11 @@ static void DrawCutsceneActorName(u16 actorIndex, Entity* self) {
     u16 chCount;
     const char* actorName;
     char ch;
-#if defined(MOD_RT_CUTSCENE)
+#if defined(MOD_RT_CUTSCENE) && !defined(MOD_RT_CUT_EXT)
     // SOTN Ultimate, Script = Retrans: the retranslation's 8 px font (its
     // tiles from MOD_RT8_TILE0 and advances in the RT font room, as the menus)
     s32 rt = *(u8*)&MOD_DUB_STATE->textPack == MOD_TEXT_PACK_RT;
-#if !defined(MOD_RT_CUT_EXT)
     const u8* rtW = (const u8*)(MOD_RT_FONT_END - MOD_RT8_CHARS);
-#endif
 #endif
 
     actorName = actor_names[DRAW_NAME_ACTOR_INDEX];
@@ -100,10 +98,8 @@ static void DrawCutsceneActorName(u16 actorIndex, Entity* self) {
 #if defined(MOD_RT_CUT_EXT)
     // (SEL: no room for the branch above; the same, done on the US sprites
     // by rt_ext.c in main.exe's free 8 KB)
-    if (rt) {
-        ((void (*)(s32, const void*, void*))MOD_RT_EXT_ADDR)(
-            MOD_RT_EXT_NAME, actor_names[DRAW_NAME_ACTOR_INDEX],
-            &g_PrimBuf[primIndex]);
+    if (g_ModRtCutScript) {
+        ((void* (*)(s32, void*))MOD_RT_EXT_ADDR)(MOD_RT_EXT_NAME, (void*)(s32)primIndex);
     }
 #endif
 }

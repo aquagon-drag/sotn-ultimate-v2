@@ -29,15 +29,18 @@
 #define MOD_RT_CUT_VY 0x180 // the text texture's top (NO3: 0x100)
 #endif
 
+#if defined(MOD_RT_CUT_EXT)
+// SEL (the endings): no room for the drawing here; the RT pack put it in
+// main.exe's free 8 KB (mods/sotn-ultimate/src/menu/rt_ext.c ModRtExt). The
+// flag alone (it is only set under the RT tag; the script cannot change
+// during a cutscene)
+#define MOD_RT_CUT_ON() g_ModRtCutScript
+#define ModRtCutChar(ch)                                                       \
+    ((void* (*)(s32, void*))MOD_RT_EXT_ADDR)((ch), &g_Dialogue)
+#else
 #define MOD_RT_CUT_ON()                                                        \
     (g_ModRtCutScript &&                                                       \
      *(u8*)&MOD_DUB_STATE->textPack == MOD_TEXT_PACK_RT)
-
-#if defined(MOD_RT_CUT_EXT)
-// SEL (the endings): no room for the drawing here; the RT pack put it in
-// main.exe's free 8 KB (mods/sotn-ultimate/src/menu/rt_ext.c ModRtExt)
-#define ModRtCutChar(ch)                                                       \
-    ((void (*)(s32, void*, void*))MOD_RT_EXT_ADDR)((ch), &g_Dialogue, NULL)
 #else
 static u8 g_ModRtCutLine[MOD_RT_CUT_MAX + 4];
 static s32 g_ModRtCutLen;
