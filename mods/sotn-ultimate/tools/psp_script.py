@@ -988,6 +988,42 @@ def rt_reflow(lines, width=RT_WRAP_PX, measure=None):
     return out
 
 
+_RT_CUT = None
+
+
+def rt_cut_fixes(vid, lines):
+    """Gerardo's corrections to a cutscene line (rt_overrides.tsv table
+    "cut", text_rt.read_overrides: index = voice id, field = text to find,
+    "/" = a line break, fifth column = the replacement). Kept characters keep
+    their waits."""
+    global _RT_CUT
+    if _RT_CUT is None:
+        import text_rt
+        _RT_CUT = {}
+        for k, (act, txt) in text_rt.read_overrides().items():
+            table, idx, find = k.split("\t", 2)
+            if table == "cut" and act == "text":
+                _RT_CUT.setdefault(int(idx), []).append((find, txt))
+    for find, repl in _RT_CUT.get(vid, []):
+        flat = []  # [(char, waits)], "/" between lines
+        for k, ln in enumerate(lines):
+            flat += ([("/", [])] if k else []) + list(ln)
+        s = "".join(c for c, _ in flat)
+        at = s.find(find)
+        if at < 0:
+            sys.exit("psp_script: rt_overrides cut 0x%X: %r not in %r" % (vid, find, s))
+        flat = flat[:at] + [(c, []) for c in repl] + flat[at + len(find):]
+        lines, ln = [], []
+        for c, w in flat:
+            if c == "/":
+                lines.append(ln)
+                ln = []
+            else:
+                ln.append((c, w))
+        lines.append(ln)
+    return lines
+
+
 def rt_part(part):
     """the PS1 script's own text kept in an RT copy (unvoiced lines such as
     Alucard's "........."): in ModRtText's bytes too (text_rt.to_bios, as
@@ -1050,7 +1086,7 @@ def transplant(part, psp, dub, report, ovl=None, rt=False, trim=False):
             continue
         lines, end_waits = psp_lines(pick(psp, sid))
         if rt:
-            lines = rt_line_bytes(rt_reflow(lines))
+            lines = rt_line_bytes(rt_reflow(rt_cut_fixes(vid, lines)))
             # (the Saturn scripts go on in the same box after 0x3C0 "I know.",
             # whose RT text ends with an empty line)
             while trim and len(lines) > 1 and not lines[-1]:

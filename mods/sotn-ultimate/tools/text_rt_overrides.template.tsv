@@ -6,6 +6,9 @@
 #   table   index   field   action  [text]
 #
 # table:  equip acc relic spell enemy menu help   (the mod's tables)
+#         cut     a cutscene line (index: its PS1 voice id, 0x..; field: the
+#                 text to find in the retranslation's line, "/" = a line
+#                 break; action text, the fifth column replaces it, "/" too)
 #         place   the file select's area names (index: the stage id, as in
 #                 the fit report; field: name; a "/" in the text sets the
 #                 line break, else it breaks at a space, 12 characters a line)
