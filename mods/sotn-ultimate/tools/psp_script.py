@@ -772,7 +772,7 @@ def flag_leads(toks):
     return out
 
 
-def jp_adjust(toks, entries, dur, typing_too=True, leads=None):
+def jp_adjust(toks, entries, dur, typing_too=True, leads=None, move_flags=True):
     """the JP dub's version of a copy's tokens (jumps inside it as ("S",
     offset in the copy)) and of its entry offsets: (tokens, entries, ids of
     the lines changed). typing_too=False: only the box holds (the PSP copies,
@@ -861,7 +861,7 @@ def jp_adjust(toks, entries, dur, typing_too=True, leads=None):
         ents[:] = [max(at, e + m) if e > at else e for e in ents]
     # the in-text flag of a FLAG_LEAD line: leads[id] frames before its box
     # ends, as on the PS1
-    for vid, lead in (leads or {}).items():
+    for vid, lead in ((leads or {}) if move_flags else {}).items():
         for i in [k for k, t in enumerate(toks) if t[0] == "PLAY_SOUND" and t[1] == vid]:
             end = i + 1
             while toks[end][0] not in BOX_END:
@@ -1299,6 +1299,15 @@ def main():
                 rfixed, rstarts = copy_tokens(rrend, off, blob, ovl, label)
                 rt_t, rents, rchanged = jp_adjust(rfixed, [so for _, so in rstarts], jdur, True,
                                                   flag_leads(toks_jp) if c_arr else leads)
+                # (used with every dub: a box is also held while the PSP dub's
+                # clip plays, where it is the longer one. Gerardo, DRE: the
+                # last voice still streamed at the Succubus's laugh, whose
+                # WAIT_FOR_SOUND then never ended: no laugh, no control back)
+                dmax = {v: max(jdur.get(v, 0), dub.get(v, 0)) for v in set(jdur) | set(dub)}
+                rt_t, rents, rchanged2 = jp_adjust(rt_t, rents, dmax, False,
+                                                   flag_leads(toks_jp) if c_arr else leads,
+                                                   move_flags=False)
+                rchanged = set(rchanged) | set(rchanged2)
                 rec = sp["scripts"][-1]
                 rec["rt_tokens"] = rt_t
                 rn = len(assemble(resolve(rt_t, BASE)))
