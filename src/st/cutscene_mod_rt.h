@@ -28,6 +28,13 @@
 #ifndef MOD_RT_CUT_VY
 #define MOD_RT_CUT_VY 0x180 // the text texture's top (NO3: 0x100)
 #endif
+// a line's first nextCharX, and the band's VRAM x: g_Dialogue.nextLineX
+// (CutsceneUnk1 sets both). NO4's US CutsceneUnk1 leaves nextLineX alone (0)
+// and starts lines at CUTSCENE_UNK1_NEXT_X: a line never started there, so
+// a replayed ferryman line kept the last one's text (Gerardo, 2026-11-19)
+#ifndef MOD_RT_CUT_X0
+#define MOD_RT_CUT_X0 g_Dialogue.nextLineX
+#endif
 
 #if defined(MOD_RT_CUT_EXT)
 // SEL (the endings): no room for the drawing here; the RT pack put it in
@@ -65,7 +72,7 @@ static void ModRtCutPut(u8 ch, s32 start) {
     *(u8**)0x8013794C = MOD_RT_CUT_BUF;
     if (((s32(*)(const u8*, s32))MOD_RT_FONT_ADDR)(
             g_ModRtCutLine, MOD_RT_CUT_ROW)) {
-        rect.x = g_Dialogue.nextLineX;
+        rect.x = MOD_RT_CUT_X0;
         rect.y = g_Dialogue.nextCharY * 12 + MOD_RT_CUT_VY;
         rect.w = MOD_RT_CUT_ROW / 2;
         rect.h = 12;
@@ -94,12 +101,12 @@ void ModRtMoveImage(RECT* src, s32 x, s32 y) {
     ch = ((src->x - 0x380) >> 1) | ((src->y - 0xF0) << 1);
     // a new line: at its start, in another band, or back to the left (a
     // line that starts with spaces)
-    if (x == g_Dialogue.nextLineX || y != g_ModRtCutY || x < g_ModRtCutX) {
+    if (x == MOD_RT_CUT_X0 || y != g_ModRtCutY || x < g_ModRtCutX) {
         g_ModRtCutLen = 0;
         for (i = 0; i < LEN(g_ModRtCutLine); i++) {
             g_ModRtCutLine[i] = 0;
         }
-        g_ModRtCutX = g_Dialogue.nextLineX;
+        g_ModRtCutX = MOD_RT_CUT_X0;
         g_ModRtCutY = y;
     }
     for (; g_ModRtCutX < x && g_ModRtCutLen < MOD_RT_CUT_MAX; g_ModRtCutX += 2) {
@@ -110,7 +117,7 @@ void ModRtMoveImage(RECT* src, s32 x, s32 y) {
 }
 #else
 static void ModRtCutChar(u8 ch) {
-    s32 start = g_Dialogue.nextCharX == g_Dialogue.nextLineX;
+    s32 start = g_Dialogue.nextCharX == MOD_RT_CUT_X0;
 
     g_Dialogue.nextCharX++;
     ModRtCutPut(ch, start);
