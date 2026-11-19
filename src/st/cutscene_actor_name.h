@@ -66,7 +66,11 @@ static void DrawCutsceneActorName(u16 actorIndex, Entity* self) {
                 prim->priority = 0x1FF;
                 prim->drawMode = DRAW_HIDE;
                 prim->x0 = x;
+#ifdef DRAW_NAME_PRIM_Y0
+                prim->y0 = DRAW_NAME_PRIM_Y0;
+#else
                 prim->y0 = g_Dialogue.startY + 6;
+#endif
                 prim = prim->next;
             }
             x += rtW[(u8)ch];
