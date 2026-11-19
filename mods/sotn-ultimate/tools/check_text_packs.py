@@ -815,7 +815,9 @@ def cd_reader_check(d, syms, sel_syms, chunks, rt_chunks, rt_packs, dra, dub):
     else:
         end = area + d["MOD_TEXT_CD_AREA"]
         used = max(v for k, v in sel_syms.items() if area <= v < end) + 4 - area
-        if not (fn == area and end <= tp.SEL_BASE + d["SECTOR"] * 0x800):
+        # (ModTextReady anywhere in it: SEL calls it by symbol; ModTextChunkOk
+        # comes first since it moved there, text_pack.h MOD_TEXT_SEL_TEXT)
+        if not (area <= fn < end and end <= tp.SEL_BASE + d["SECTOR"] * 0x800):
             fail("SEL's reader at 0x%X-0x%X, the first chunk at 0x%X" % (area, end, tp.SEL_BASE + d["SECTOR"] * 0x800))
         else:
             print("OK   text packs: SEL's reader (ModTextReady + state) at 0x%X, %d of %d B, before the "
