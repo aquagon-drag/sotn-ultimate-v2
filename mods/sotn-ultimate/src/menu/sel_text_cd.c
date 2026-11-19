@@ -108,3 +108,27 @@ s32 ModTextReady(void) {
     g_ModTextCdT0 = VSync(-1);
     return 0;
 }
+
+#if defined(MOD_TEST_ENDING_SHORTCUT)
+// Test aid (game_mod.h; test branch only): 2C048.c calls this when a file's
+// load is done. L1+R1 held: the Dracula fight instead of the save's room.
+void ModTestEnding(void) {
+    EnemyDef* dracula;
+
+    if ((g_pads[0].pressed & (PAD_L1 | PAD_R1)) != (PAD_L1 | PAD_R1) ||
+        g_PlayableCharacter != PLAYER_ALUCARD) {
+        return;
+    }
+    // the arrival of teleport 0x08 (RCEN -> Dracula): RBO6 room (31,30)
+    g_StageId = STAGE_RBO6;
+    g_Tilemap.left = 0x1F;
+    g_Tilemap.top = 0x1E;
+    // the good route's state (Richter freed, inverted castle open)
+    g_CastleFlags[SHAFT_ORB_DEFEATED] = 1;
+    g_CastleFlags[INVERTED_CASTLE_UNLOCKED] = 1;
+    // Dracula dies on the first hit that lands
+    dracula = &g_api.enemyDefs[ENEMY_DRACULA_LV98];
+    dracula->hitPoints = 1;
+    dracula->defense = 0;
+}
+#endif
