@@ -172,6 +172,7 @@ static bool dialogue_started;
 // Unused by pspeu and deadstripped
 #include "../cutscene_scale_avatar.h"
 
+#define MOD_RT_CUT_X0 CUTSCENE_UNK1_NEXT_X // (no nextLineX in NO4: cutscene_mod_rt.h)
 #include "../cutscene_mod_rt.h"
 
 void EntityCutscene(Entity* self) {
