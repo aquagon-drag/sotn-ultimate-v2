@@ -910,6 +910,84 @@ def jp_lines(toks, dur, target):
     return out
 
 
+# Script = Retrans: the US dialogue box shows ~175 px of text (x 72..248 of
+# the 256 px screen); the retranslation wrapped for the JP box (up to 185
+# px). Its lines are reflowed to this width (Gerardo, 2026-11-19).
+RT_WRAP_PX = 170
+RT_HARD_END = (".", "?", "!", "\u2026", '"', ")", "'")
+
+
+def rt_reflow(lines, width=RT_WRAP_PX, measure=None):
+    """the retranslation's lines [[(char, waits)]] -> lines of at most width
+    px: a break after a sentence end (RT_HARD_END) or around an empty line
+    stays; the patch's mid-sentence breaks are joined and each paragraph is
+    refilled greedily. A wait on a dropped space moves to the next character."""
+    if measure is None:
+        import text_rt
+        measure = lambda t: text_rt.rt_width(text_rt.to_bios(t))
+    paras, cur = [], []
+    for ln in lines:
+        txt = "".join(c for c, _ in ln).rstrip()
+        if not txt:
+            if cur:
+                paras.append(cur)
+                cur = []
+            paras.append([])  # (an empty line stays)
+            continue
+        cur.append(ln)
+        if txt.endswith(RT_HARD_END):
+            paras.append(cur)
+            cur = []
+    if cur:
+        paras.append(cur)
+    out = []
+    for para in paras:
+        if not para:
+            out.append([])
+            continue
+        words, w, carry = [], [], []
+        for k, ln in enumerate(para):
+            for ch, ws in ln:
+                if ch == " ":
+                    if w:
+                        words.append(w)
+                        w = []
+                    carry = carry + list(ws)
+                    continue
+                w.append((ch, carry + list(ws)))
+                carry = []
+            if w:
+                words.append(w)
+                w = []
+        # fewest lines, then the most even ones (least sum of squared slack,
+        # the last line included: no orphan word)
+        n = len(words)
+        text = ["".join(c for c, _ in wd) for wd in words]
+        fit = {}
+        for i in range(n):
+            for j in range(i + 1, n + 1):
+                wpx = measure(" ".join(text[i:j]))
+                if wpx > width and j > i + 1:
+                    break
+                fit[i, j] = wpx
+        best = {n: (0, 0, None)}  # i -> (lines, cost, next break)
+        for i in range(n - 1, -1, -1):
+            cands = [(best[j][0] + 1, best[j][1] + (width - fit[i, j]) ** 2, j)
+                     for j in range(i + 1, n + 1) if (i, j) in fit and j in best]
+            best[i] = min(cands)
+        i = 0
+        while i < n:
+            j = best[i][2]
+            ln = []
+            for wd in words[i:j]:
+                ln += ([(" ", [])] if ln else []) + wd
+            out.append(ln)
+            i = j
+        if carry and out and out[-1]:
+            out[-1].append((" ", carry))  # (waits after the last word: keep)
+    return out
+
+
 def rt_line_bytes(lines):
     """an RT copy's lines: each character as the bytes ModRtText reads
     (text_rt.to_bios: ASCII letters / digits / space, Shift-JIS punctuation),
@@ -962,7 +1040,7 @@ def transplant(part, psp, dub, report, ovl=None, rt=False, trim=False):
             continue
         lines, end_waits = psp_lines(pick(psp, sid))
         if rt:
-            lines = rt_line_bytes(lines)
+            lines = rt_line_bytes(rt_reflow(lines))
             # (the Saturn scripts go on in the same box after 0x3C0 "I know.",
             # whose RT text ends with an empty line)
             while trim and len(lines) > 1 and not lines[-1]:
