@@ -988,6 +988,16 @@ def rt_reflow(lines, width=RT_WRAP_PX, measure=None):
     return out
 
 
+def rt_part(part):
+    """the PS1 script's own text kept in an RT copy (unvoiced lines such as
+    Alucard's "........."): in ModRtText's bytes too (text_rt.to_bios, as
+    rt_line_bytes). Left in the US bytes, ModRtText rejects the line (ASCII
+    punctuation) and the box shows an empty line (Gerardo, NZ0 / BO5)"""
+    import text_rt
+    return [("TEXT", "".join(text_rt.to_bios(c).decode("latin-1") for c in t[1]))
+            if t[0] == "TEXT" else t for t in part]
+
+
 def rt_line_bytes(lines):
     """an RT copy's lines: each character as the bytes ModRtText reads
     (text_rt.to_bios: ASCII letters / digits / space, Shift-JIS punctuation),
@@ -1285,7 +1295,7 @@ def main():
                     if miss:
                         plan, _, _ = transplant(part, psp, jdur, [], ovl)  # (whole part)
                         rmiss += miss
-                    rrend.append((part, render(part, plan, 0, extra_ids)))
+                    rrend.append((part, render(rt_part(part), plan, 0, extra_ids)))
                 rfixed, rstarts = copy_tokens(rrend, off, blob, ovl, label)
                 rt_t, rents, rchanged = jp_adjust(rfixed, [so for _, so in rstarts], jdur, True,
                                                   flag_leads(toks_jp) if c_arr else leads)
