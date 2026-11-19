@@ -45,6 +45,7 @@ same takes). Writes build/us/jp_dub/dub.json (repack_xa.py --dub-jp).
 """
 import argparse
 import json
+import math
 import os
 import re
 import shutil
@@ -81,6 +82,12 @@ SDF0 = os.path.join(ROOT, "disks/saturn/SD/SDF0.PCM")
 SAT_INDEX = os.path.join(ROOT, "disks/saturn/0.BIN")  # base 0x06004080
 SAT_SLOTS = range(0x3BA, 0x3D0)  # PS1 slots = Saturn ids + 2
 SAT_RATE = 22050
+# the JP dub's slots that play two PSP JP files back to back (the Japanese
+# take is split where the English one is a single file): 0x38B, the
+# Succubus's reveal laugh (080a) then "You broke free of my spell" (080b);
+# the English 080b starts with the laugh, so VOICE_OVERRIDE gives 080b only,
+# which left the JP dub without the laugh (Gerardo, 2026-11-19)
+JP_JOIN = {0x38B: ("080a", "080b")}
 # Saturn ids whose take is not the PSP JP one (no loudness reference)
 SAT_OTHER_TAKES = {0x3BE, 0x3C2, 0x3C3, 0x3CA}
 # silence trim: window RMS under this is silence; keep a little around it
@@ -230,6 +237,28 @@ def read_wav(path):
         return np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float64)
 
 
+def join_xa(parts, out):
+    """encode() results -> one mono XA stream at out: the sectors back to
+    back, the end-of-record / end-of-file bits (subheader submode, bytes 18
+    and 22 of each 2352-byte sector) kept on the last sector only. The
+    earlier parts end padded to whole sectors (silence), so the length is
+    theirs in sectors plus the last part's seconds; the stop timer as
+    audio.ts encodeVoice sets it (frames rounded up + TIMER_MARGIN)"""
+    data = bytearray()
+    for r in parts:
+        d = open(r["xa"], "rb").read()
+        assert len(d) % 2352 == 0 and len(d) // 2352 == r["sectors"], (r["xa"], len(d))
+        data += d
+    n = len(data) // 2352
+    for k in range(n - 1):
+        for o in (18, 22):
+            data[k * 2352 + o] &= ~0x81 & 0xFF
+    open(out, "wb").write(data)
+    seconds = sum(r["sectors"] * 4032 / RATE for r in parts[:-1]) + parts[-1]["seconds"]
+    return {"xa": out, "sectors": n, "seconds": round(seconds, 3),
+            "unk228": math.ceil(seconds * 60) + TIMER_MARGIN}
+
+
 def main_jp():
     """--set jp: build/us/jp_dub/dub.json (see the module doc)"""
     os.makedirs(JP_WORK, exist_ok=True)
@@ -272,7 +301,9 @@ def main_jp():
             ratios.append(a / b)
     sat_gain = float(np.median(ratios))
     extra_names = [names[p - 0x300][:-4] for _, p, _ in EXTRA]
-    todo = sorted(set(jobs.values()) | set(extra_names))
+    join_names = {n for parts in JP_JOIN.values() for n in parts}
+    assert join_names <= have, sorted(join_names - have)
+    todo = sorted(set(jobs.values()) | set(extra_names) | join_names)
     with ThreadPoolExecutor(8) as ex:
         enc = dict(zip(todo, ex.map(lambda n: encode(
             n, exe, path_of, os.path.join(JP_AT3_DIR, n + ".at3"), JP_WORK, GAIN_JP), todo)))
@@ -284,6 +315,14 @@ def main_jp():
     for c, name in jobs.items():
         r = enc[name]
         replace[str(c)] = {"name": name, "xa": r["xa"], "sectors": r["sectors"],
+                           "unk228": r["unk228"], "seconds": r["seconds"],
+                           "old_unk228": retail[c][1]}
+    for ps1, parts in JP_JOIN.items():
+        c = ps1 - 0x300
+        if str(c) not in replace:
+            continue
+        r = join_xa([enc[n] for n in parts], os.path.join(JP_WORK, "+".join(parts) + ".xa"))
+        replace[str(c)] = {"name": "+".join(parts), "xa": r["xa"], "sectors": r["sectors"],
                            "unk228": r["unk228"], "seconds": r["seconds"],
                            "old_unk228": retail[c][1]}
     for c, r in senc.items():
