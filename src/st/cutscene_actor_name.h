@@ -8,6 +8,40 @@ extern const char* actor_names[];
 #define DRAW_NAME_ACTOR_INDEX actorIndex
 #endif
 
+#if defined(MOD_CUT_REPICK)
+// SOTN Ultimate: the Script or Dub row changed in the System screen after
+// the room loaded (SetCutsceneScript chose the copy then): at the first name
+// tag the copy is chosen again, and the script goes on in the new one right
+// after its first SET_PORTRAIT, as here (mod_psp_script.h ModCutOff;
+// psp_script.py repick_offs). Anything else: the copy plays on as before
+static void ModCutRepick(void) {
+    u8* s;
+    u32 a;
+    u32 b;
+#if defined(MOD_RT_CUTSCENE)
+    u8 rt = g_ModRtCutScript;
+#endif
+
+    if (!g_ModCutFirst) {
+        return;
+    }
+    g_ModCutFirst = 0;
+    s = ModPspScriptPick(g_ModCutOrig);
+    if (s != g_ModCutPicked) {
+        a = ModCutOff(g_ModCutPicked);
+        b = ModCutOff(s);
+        if (a && b && g_Dialogue.scriptCur == g_ModCutPicked + a) {
+            g_Dialogue.scriptCur = s + b;
+            g_ModCutPicked = s;
+            return;
+        }
+    }
+#if defined(MOD_RT_CUTSCENE)
+    g_ModRtCutScript = rt;
+#endif
+}
+#endif
+
 // Creates primitives for the actor name at the head of the dialogue
 static void DrawCutsceneActorName(u16 actorIndex, Entity* self) {
     Primitive* prim;
@@ -23,6 +57,9 @@ static void DrawCutsceneActorName(u16 actorIndex, Entity* self) {
     const u8* rtW = (const u8*)(MOD_RT_FONT_END - MOD_RT8_CHARS);
 #endif
 
+#if defined(MOD_CUT_REPICK)
+    ModCutRepick();
+#endif
     actorName = actor_names[DRAW_NAME_ACTOR_INDEX];
     chCount = 0;
     while (true) {

@@ -1289,9 +1289,11 @@ def main():
             check_widths(fixed, ovl)
             n = len(assemble(resolve(fixed, BASE)))
             sp = spills.setdefault(ovl, {"size": 0, "scripts": []})
+            orig_t = toks_jp if "c" in sc else toks
             sp["scripts"].append({
                 "off": off, "sym": sc.get("sym"), "at": sp["size"], "tokens": fixed,
-                "old": blob.hex(), "entries": [[po, sp["size"] + so] for po, so in starts]})
+                "old": blob.hex(), "entries": [[po, sp["size"] + so] for po, so in starts],
+                "offs": repick_offs(orig_t, fixed, starts, report, "PSP")})
             sp["size"] += n
             report.append("  PSP copy: %d bytes at +%d (PS1 %d bytes), %d boxes held%s" % (
                 n, sp["size"] - n, len(blob), len(held),
@@ -1310,6 +1312,8 @@ def main():
                 check_widths(jt, ovl)
                 rec = sp["scripts"][-1]
                 rec["jp_tokens"] = jt
+                rec["jp_offs"] = repick_offs(orig_t, jt, [(po, so) for (po, _), so in
+                                                          zip(starts, jents)], report, "JP")
                 jn = len(assemble(resolve(jt, BASE)))
                 if ovl not in C_ARRAYS:
                     js = sp.get("jp_size", 0)
@@ -1346,6 +1350,8 @@ def main():
                 rchanged = set(rchanged) | set(rchanged2)
                 rec = sp["scripts"][-1]
                 rec["rt_tokens"] = rt_t
+                rec["rt_offs"] = repick_offs(orig_t, rt_t, [(po, so) for (po, _), so in
+                                                            zip(rstarts, rents)], report, "RT")
                 rn = len(assemble(resolve(rt_t, BASE)))
                 if ovl in RT_EXT:
                     # (text_packs.py puts it in the RT pack; its entries are
@@ -1421,6 +1427,49 @@ def copy_tokens(rendered, off, blob, ovl, label):
                 t = tuple(list(t[:head]) + tg)
             fixed.append(t)
     return fixed, starts
+
+
+# Script / Dub changed in the System screen after the room's cutscene entity
+# chose its copy (SetCutsceneScript runs when the room loads): at the first
+# box's name tag (DrawCutsceneActorName, cutscene_actor_name.h ModCutRepick)
+# the copy is chosen again and the script goes on in it, at the same point:
+# right after its first SET_PORTRAIT. These are those offsets from an entry
+# (0: none, no switch). Gerardo, RBO2: RT text drawn as US glyphs (garbage).
+REPICK_TIMING = {"SET_WAIT", "SET_SPEED", "SCRIPT_UNKNOWN_11", "WAIT_FOR_SOUND"}
+
+
+def portrait_after(toks, start):
+    """(offset from start to just after the first SET_PORTRAIT, the ops
+    before it) or (0, ops) where a TEXT comes first / start is no token's"""
+    o, on, ops = 0, False, []
+    for t in toks:
+        if o == start:
+            on = True
+        if on:
+            if t[0] == "SET_PORTRAIT":
+                return o + tok_size(t) - start, ops
+            if t[0] == "TEXT":
+                return 0, ops
+            if t[0] not in REPICK_TIMING:
+                ops.append(t[0])
+        o += tok_size(t)
+    return 0, ops
+
+
+def repick_offs(orig, copy, pairs, report, what):
+    """[(orig offset, copy offset)] for the entries [(orig start, copy start)];
+    0 for both where the ops before the portrait differ (beyond timing)"""
+    out = []
+    for po, so in pairs:
+        a, oa = portrait_after(orig, po)
+        b, ob = portrait_after(copy, so)
+        if not a or not b or oa != ob:
+            if a or b:
+                report.append("  %s +0x%X: no repick (%s / %s)" % (
+                    what, po, " ".join(oa) or "-", " ".join(ob) or "-"))
+            a = b = 0
+        out.append((a, b))
+    return out
 
 
 def resolve(toks, base):
@@ -1499,6 +1548,50 @@ HDR_FN = """static u8* ModPspScript(u8* script) {
 """
 
 
+HDR_REPICK = """static u8* g_ModCutOrig;   // the script SetCutsceneScript was given
+static u8* g_ModCutPicked; // the copy it plays
+static u8 g_ModCutFirst;   // its first name tag not drawn yet
+static u8* ModPspScript(u8* script) {
+    g_ModCutOrig = script;
+    g_ModCutFirst = 1;
+    return g_ModCutPicked = ModPspScriptPick(script);
+}
+// an entry's offset to just after its first SET_PORTRAIT (0: none)
+static u32 ModCutOff(u8* s) {
+    u32 i;
+
+%s    return 0;
+}
+"""
+HDR_REPICK_MAP = """    for (i = 0; i < sizeof(g_Mod%(m)sMap) / sizeof(g_Mod%(m)sMap[0]); i++) {
+        if (s == g_Mod%(m)sMap[i][0]) {
+            return g_Mod%(m)sOff[i][0];
+        }
+        if (s == g_Mod%(m)sMap[i][1]) {
+            return g_Mod%(m)sOff[i][1];
+        }
+    }
+"""
+
+
+def repick_fn(fn, offs):
+    """ModPspScript as ModPspScriptPick, and the repick's state and offsets
+    (cutscene_actor_name.h ModCutRepick)"""
+    s = ("// Script / Dub changed after the room loaded: the copy is chosen again\n"
+         "// at the first name tag (cutscene_actor_name.h ModCutRepick)\n"
+         "#define MOD_CUT_REPICK\n")
+    loops = ""
+    for m in ("Psp", "Jp", "Rt"):
+        if not offs.get(m):
+            continue
+        s += "static const u16 g_Mod%sOff[][2] = {\n%s\n};\n" % (
+            m, "\n".join("    {%d, %d}," % ab for ab in offs[m]))
+        loops += HDR_REPICK_MAP % {"m": m}
+    fn = fn.replace("static u8* ModPspScript(u8* script) {",
+                    "static u8* ModPspScriptPick(u8* script) {", 1)
+    return s + fn + HDR_REPICK % loops
+
+
 def write_spill_headers(spills):
     for ovl, c in SPILL_C.items():
         path = os.path.join(ROOT, os.path.dirname(c), "mod_psp_script.h")
@@ -1538,6 +1631,9 @@ def write_spill_headers(spills):
                 s += "};\n"
                 rrows.append("    {%s, g_ModRtCopy%d}," % (sc["sym"], k))
             s += "static u8* const g_ModPspMap[][2] = {\n" + "\n".join(rows) + "\n};\n"
+            offs = {"Psp": [sc["offs"][0] for sc in sp["scripts"]],
+                    "Jp": [sc["jp_offs"][0] for sc in sp["scripts"] if sc.get("jp_tokens")],
+                    "Rt": [sc["rt_offs"][0] for sc in sp["scripts"] if sc.get("rt_tokens")]}
             if rrows:
                 s += (HDR_RT_DEFS + "static u8* const g_ModRtMap[][2] = {\n" +
                       "\n".join(rrows) + "\n};\n")
@@ -1549,7 +1645,7 @@ def write_spill_headers(spills):
             fn = HDR_FN_JP if jrows else HDR_FN
             if rrows:
                 fn = fn.replace("    u32 i;\n\n", HDR_RT, 1)
-            s += fn
+            s += repick_fn(fn, offs)
         elif sp:
             s += ("// (g_ModPspSpill is filled in the built overlay by --apply)\n"
                   "#define MOD_PSP_SCRIPT\n"
@@ -1589,7 +1685,15 @@ def write_spill_headers(spills):
                 fn = fn.replace("    u32 i;\n\n", HDR_RT, 1)
             elif sp.get("rt_ext"):
                 fn = fn.replace("    u32 i;\n\n", HDR_RT_EXT, 1)
-            s += fn
+            if ovl in RT_EXT:
+                s += fn  # (SEL: no System screen, no room for it)
+            else:
+                offs = {"Psp": [o for sc in sp["scripts"] for o in sc["offs"]],
+                        "Jp": [o for sc in sp["scripts"] for o in sc.get("jp_offs", [])]
+                        if sp.get("jp_size") else [],
+                        "Rt": [o for sc in sp["scripts"] for o in sc.get("rt_offs", [])]
+                        if sp.get("rt_size") else []}
+                s += repick_fn(fn, offs)
         if sp:
             s = s.replace("#define MOD_PSP_SCRIPT\n",
                           "#if defined(MOD_SATURN) && defined(VERSION_US)\n"
