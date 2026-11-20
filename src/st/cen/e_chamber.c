@@ -581,7 +581,9 @@ void EntityPlatform(Entity* self) {
         break;
     case 11:
         // the fight (her death sets step 12)
-#if defined(MOD_CENP)
+        // Saturn fight too (Gerardo, 2026-11-20): her arena (Saturn x
+        // 0x15E-0x262 = SX 0x118-0x1E8) is this middle screen, and her wall
+        // turns test g_Tilemap.x / width as if they were its edges
         // the PSP's step 6 SetTilemap(): the camera locked on the room's
         // middle screen (scroll 0x100) for the whole fight. Her fight logic's
         // positions (e_maria.c: 0x146/0x1B9 around 0x180) assume it; with
@@ -591,15 +593,12 @@ void EntityPlatform(Entity* self) {
         g_Tilemap.y = 0x100;
         g_Tilemap.x = 0x100;
         g_Tilemap.width = 0x200;
-#endif
         break;
     case 12:
         // 060DE1D8: Alucard walks to the room's middle
-#if defined(MOD_CENP)
         g_Tilemap.y = 0; // the room's own bounds back (PS1: x 0, y 0, 0x300)
         g_Tilemap.x = 0;
         g_Tilemap.width = 0x300;
-#endif
         g_PauseAllowed = false;
         g_unkGraphicsStruct.pauseEnemies = 1;
         g_Player.padSim = PAD_NONE;
