@@ -1442,7 +1442,7 @@ def portrait_after(toks, start):
     """(offset from start to just after the first SET_PORTRAIT, the ops
     before it) or (0, ops) where a TEXT comes first / start is no token's"""
     o, on, ops = 0, False, []
-    for t in toks:
+    for t in resolve(toks, BASE):  # (a copy's ("S", offset) jumps: sized)
         if o == start:
             on = True
         if on:
